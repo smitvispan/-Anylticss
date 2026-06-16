@@ -79,14 +79,7 @@ export default function AuthScreen({
                 <h4 className="font-medium">{heading}</h4>
                 <div className="text-default-500 text-base">{description}</div>
               </div>
-              <LoginForm
-                locale={locale}
-                callbackUrl={callbackUrl}
-                loginMode={loginMode}
-                defaultEmail={defaultEmail}
-                defaultPassword={defaultPassword}
-                autoSubmit={autoSubmit}
-              />
+              <LoginForm locale={locale} />
             </div>
             <div className="text-xs font-normal text-default-500 z-999 pb-10 text-center">
               <Copyright />

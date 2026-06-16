@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import { useTheme } from "next-themes";
 
-const Logo = () => {
+const Logo = ({ title }: { title?: string }) => {
     const { theme: mode } = useTheme();
   return (
     <div className="flex items-center space-x-3">
@@ -17,7 +17,7 @@ const Logo = () => {
         height={50}
         className="max-w-[50px] max-h-[50px]"
       />
-      <h1 className="text-2xl font-bold text-blue-600">Vispan Solutions</h1>
+      <h1 className="text-2xl font-bold text-blue-600">{title || "Vispan Solutions"}</h1>
     </div>
   );
 }
