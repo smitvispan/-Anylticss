@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: digitalmarketingdashboard
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Add other necessary environment variables below
+      # - key: DATABASE_URL
+      #   sync: false

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Proposal - Subscription & Reseller System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #64748b;
+            --dark: #0f172a;
+            --light: #f8fafc;
+            --accent: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--dark);
+            background: #fff;
+            margin: 0;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 1px solid #e2e8f0;
+            padding: 60px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+        .header-title h1 {
+            margin: 0;
+            font-size: 28px;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .header-meta {
+            text-align: right;
+            font-size: 14px;
+            color: var(--secondary);
+        }
+        h2 {
+            font-size: 20px;
+            border-left: 4px solid var(--primary);
+            padding-left: 15px;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            color: var(--dark);
+        }
+        p, li {
+            font-size: 16px;
+            color: #334155;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background: var(--light);
+            font-weight: 600;
+        }
+        .total-row {
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .footer {
+            margin-top: 60px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+            font-size: 14px;
+            color: var(--secondary);
+        }
+        .signature {
+            margin-top: 40px;
+            display: flex;
+            gap: 100px;
+        }
+        .sig-box {
+            border-top: 1px solid var(--dark);
+            width: 200px;
+            padding-top: 10px;
+            font-size: 12px;
+        }
+        @media print {
+            body { padding: 0; }
+            .container { box-shadow: none; border: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-title">
+                <h1>Project Proposal</h1>
+                <p style="font-size: 14px; margin-top: 5px;">Implementation of Subscription & Reseller System</p>
+            </div>
+            <div class="header-meta">
+                <strong>Date:</strong> April 13, 2026<br>
+                <strong>Ref:</strong> ANL-2026-001
+            </div>
+        </div>
+
+        <section>
+            <h2>1. Executive Summary</h2>
+            <p>This proposal outlines the implementation of a multi-tier subscription and reseller hierarchy for your analytics platform. The system will enable a scalable business model where clients can manage sub-clients under tiered accounts with automated limits and instant activation.</p>
+        </section>
+
+        <section>
+            <h2>2. Key Features</h2>
+            <ul>
+                <li><strong>Reseller Hierarchy:</strong> Master accounts can create and oversee sub-clients.</li>
+                <li><strong>Tiered Pricing:</strong> Support for custom plans (e.g., ₹100 for 3 account slots).</li>
+                <li><strong>Automated Lifecycle:</strong> Instant service activation upon verified purchase.</li>
+                <li><strong>Dynamic Limit Enforcement:</strong> Real-time guards to prevent account overages.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>3. Project Timeline & Estimates</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Phase</th>
+                        <th>Duration</th>
+                        <th>Key Deliverables</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Foundations</strong></td>
+                        <td>3 Days</td>
+                        <td>Hierarchical User Models & Roles</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Core Logic</strong></td>
+                        <td>4 Days</td>
+                        <td>Reseller Portal & Limit Enforcement</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Automation</strong></td>
+                        <td>4 Days</td>
+                        <td>Subscription APIs & Auto-Activation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>QA & Launch</strong></td>
+                        <td>2 Days</td>
+                        <td>Final Testing & System Handover</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td colspan="2"><strong>Estimated Completion Time</strong></td>
+                        <td><strong>9 - 13 Business Days</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>4. Next Steps</h2>
+            <p>Upon approval, we will begin Phase 1 immediately. This phase will solidify the underlying architecture required for the reseller hierarchy.</p>
+        </section>
+
+        <div class="footer">
+            <p><em>This document is a formal project estimate. Timelines are subject to final requirement confirmation.</em></p>
+            <div class="signature">
+                <div class="sig-box">Authorized Signature</div>
+                <div class="sig-box">Client Signature</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
