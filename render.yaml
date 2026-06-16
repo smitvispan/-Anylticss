@@ -3,11 +3,33 @@ services:
     name: digitalmarketingdashboard
     env: node
     plan: free
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    buildCommand: |
+      npm install
+      npm run build
+    startCommand: |
+      npm run start
     envVars:
       - key: NODE_ENV
         value: production
-      # Add other necessary environment variables below
-      # - key: DATABASE_URL
-      #   sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: NEXTAUTH_URL
+        value: https://anylticss-1.onrender.com
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: FACEBOOK_CLIENT_ID
+        sync: false
+      - key: FACEBOOK_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
