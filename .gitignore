@@ -27,4 +27,4 @@ site.id
 
 # Build artifacts
 *.tsbuildinfo
-tsconfig.typecheck.tsbuildinfo
+tsconfig.typecheck.tsbuildinfodump/
