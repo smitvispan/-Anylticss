@@ -3,9 +3,6 @@ import mongoose, { Document, Schema } from 'mongoose';
 // Define an interface that describes the properties of the User document
 interface IUser extends Document {
   name: string;
-  agencyWebsite: string | null;
-  role: string;
-  parent_client_id: mongoose.Types.ObjectId | null;
   email: string;
   emailVerified: Date | null;
   password: string;
@@ -21,7 +18,6 @@ interface IUser extends Document {
   mainAd: mongoose.Types.ObjectId | null;
   mainGoogleAd: mongoose.Types.ObjectId | null;
   mainSEOsites: mongoose.Types.ObjectId | null;
-  connectAll: boolean;
   googleSearchConsoleAccounts: mongoose.Types.ObjectId[];
   googleAdsAccounts: mongoose.Types.ObjectId[];
   campaigns: mongoose.Types.ObjectId[];
@@ -29,7 +25,6 @@ interface IUser extends Document {
   client_id: string | null;
   contact_id: string | null;
   ERP_token: string | null;
-  activeSubscription: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,16 +32,12 @@ interface IUser extends Document {
 // Define the schema for the User model
 const userSchema = new Schema<IUser>({
   name: { type: String },
-  agencyWebsite: { type: String, default: null },
-  role: { type: String, enum: ['client', 'user'], default: 'client' },
-  parent_client_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   email: { type: String, unique: true },
   emailVerified: { type: Date, default: null },
   password: { type: String },
   image: { type: String, default: null },
   accounts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Account' }],
   sessions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Session' }],
-  activeSubscription: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription', default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now, required: true },
   pages: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Page' }],
@@ -57,7 +48,6 @@ const userSchema = new Schema<IUser>({
   mainAd: { type: mongoose.Schema.Types.ObjectId, ref: 'AdAccount' },
   mainGoogleAd: { type: mongoose.Schema.Types.ObjectId, ref: 'AdAccount' },
   mainSEOsites: { type: mongoose.Schema.Types.ObjectId, ref: 'GscSite' },
-  connectAll: { type: Boolean, default: false },
   isAdmin: { type: Boolean, default: false },
   googleSearchConsoleAccounts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GoogleSearchConsoleAccount' }],
   googleAdsAccounts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GoogleAdsAccount' }],

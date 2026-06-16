@@ -346,8 +346,7 @@ export async function fetchAndStoreSubAccounts(
     userEmail?: string | null
 ) {
     const normalizedId = normalizeCustomerId(managerId);
-    const apiVersion = process.env.GOOGLE_ADS_API_VERSION || "v22";
-    const url = `https://googleads.googleapis.com/${apiVersion}/customers/${managerId}/googleAds:search`;
+    const url = `https://googleads.googleapis.com/v19/customers/${managerId}/googleAds:search`;
 
     const headers: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
@@ -446,8 +445,7 @@ export async function fetchGoogleCampaignsUsingGAQL(
     accessToken: string,
     customerId: string
 ) {
-    const apiVersion = process.env.GOOGLE_ADS_API_VERSION || "v22";
-    const url = `https://googleads.googleapis.com/${apiVersion}/customers/${customerId}/googleAds:search`;
+    const url = `https://googleads.googleapis.com/v19/customers/${customerId}/googleAds:search`;
 
     const headers: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,

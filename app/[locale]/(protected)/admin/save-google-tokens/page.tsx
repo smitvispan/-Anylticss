@@ -1,27 +1,23 @@
 "use client";
 
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function SaveGoogleTokens() {
-  const routeParams = useParams<{ locale: string }>();
-  const searchParams = useSearchParams();
+  const params = useSearchParams();
   const router = useRouter();
 
   useEffect(() => {
-    if (!searchParams) return;
+    if (!params) return;
 
-    const locale = typeof routeParams?.locale === "string" ? routeParams.locale : "en";
-
-    const accessToken = searchParams.get("accessToken");
-    const refreshToken = searchParams.get("refreshToken");
-    const scope = searchParams.get("scope");
-    const expiresAt = searchParams.get("expiresAt");
-    const googleId = searchParams.get("googleId");
-    const email = searchParams.get("email");
-    const name = searchParams.get("name");
-    const profilePic = searchParams.get("profilePic");
-    const ownerId = searchParams.get("ownerId");
+    const accessToken = params.get("accessToken");
+    const refreshToken = params.get("refreshToken");
+    const scope = params.get("scope");
+    const expiresAt = params.get("expiresAt");
+    const googleId = params.get("googleId");
+    const email = params.get("email");
+    const name = params.get("name");
+    const profilePic = params.get("profilePic");
 
     if (accessToken) {
       fetch("/api/google/save-tokens", {
@@ -36,17 +32,16 @@ export default function SaveGoogleTokens() {
           email,
           name,
           profilePic,
-          ownerId,
         }),
       })
         .catch((err) => {
           console.error("Failed to sync Google data", err);
         })
         .finally(() => {
-          router.push(`/${locale}/admin`);
+          router.push("/en/admin"); // go back
         });
     }
-  }, [routeParams, router, searchParams]);
+  }, [params, router]);
 
   return <p>Saving Google tokens…</p>;
 }

@@ -3,7 +3,6 @@ import Account from "@/models/Account";
 import User from "@/models/User";
 import Page from "@/models/Page";
 import InstagramAccount from "@/models/InstagramAccount";
-import { getMetaGraphApiBase } from "@/lib/meta-api";
 
 type IGAccount = {
   id: string;
@@ -18,7 +17,7 @@ type IGAccount = {
 
 async function fetchInstagramAccounts(userAccessToken: string) {
   const collected: IGAccount[] = [];
-  let url = `${getMetaGraphApiBase()}/me/instagram_accounts?fields=id,username,profile_picture_url,followers_count,follows_count,media_count,name&access_token=${encodeURIComponent(
+  let url = `https://graph.facebook.com/v19.0/me/instagram_accounts?fields=id,username,profile_picture_url,followers_count,follows_count,media_count,name&access_token=${encodeURIComponent(
     userAccessToken
   )}`;
   console.log("Fetching Instagram accounts from:", url);

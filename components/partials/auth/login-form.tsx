@@ -1,9 +1,10 @@
 "use client";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Link } from "@/i18n/routing";
 import { Icon } from "@/components/ui/icon";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,34 +12,20 @@ import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react"; // Import from next-auth
 
 const schema = z.object({
   email: z.string().email({ message: "Your email is invalid." }),
   password: z.string().min(4, { message: "Password must be at least 4 characters long." }),
 });
 
-type Props = {
-  locale?: string;
-  callbackUrl?: string | null;
-  defaultEmail?: string;
-  defaultPassword?: string;
-  autoSubmit?: boolean;
-};
-type LoginMode = "admin" | "client" | "user";
+type Props = { locale?: string };
 
-const LoginForm: React.FC<Props & { loginMode?: LoginMode }> = ({
-  locale = "en",
-  callbackUrl,
-  loginMode = "user",
-  defaultEmail = "",
-  defaultPassword = "",
-  autoSubmit = false,
-}) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [keepSignedIn, setKeepSignedIn] = useState(false);
+const LoginForm: React.FC<Props> = ({ locale = "en" }) => {
+  const [isLoading, setIsLoading] = useState(false); // Use state for loading
+  const router = useRouter();
   const [passwordType, setPasswordType] = useState<"password" | "text">("password");
-  const autoSubmitTriggered = useRef(false);
 
   const togglePasswordType = () => {
     setPasswordType((t) => (t === "password" ? "text" : "password"));
@@ -48,98 +35,44 @@ const LoginForm: React.FC<Props & { loginMode?: LoginMode }> = ({
     register,
     handleSubmit,
     formState: { errors },
-    reset,
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     mode: "all",
-    defaultValues: { email: defaultEmail, password: defaultPassword },
+    defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = useCallback(async (data: z.infer<typeof schema>) => {
-    setIsLoading(true);
+  const onSubmit = async (data: z.infer<typeof schema>) => {
+    setIsLoading(true); // Start loading state
 
     try {
-      const safeCallbackUrl = callbackUrl?.startsWith("/") ? callbackUrl : null;
-      const adminUrl = `/${locale}/admin`;
+      const callbackUrl = `/${locale}/admin`; // locale-aware
 
-      let nextUrl = safeCallbackUrl ?? adminUrl;
+      // Perform sign-in with next-auth
+      const res = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false, // we route manually
+        callbackUrl, // pass it anyway (future-proof)
+      });
 
-      if (loginMode !== "admin") {
-        const response = await fetch("/api/client/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            email: data.email,
-            password: data.password,
-            keepSignedIn,
-            loginMode,
-          }),
-        });
+      if (!res) {
+        toast.error("Login failed. Please try again.");
+        return;
+      }
 
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload?.user?.id) {
-          toast.error(payload?.error ?? "Invalid email or password");
-          return;
-        }
-
-        nextUrl = safeCallbackUrl ?? `/${locale}/analytics/${payload.user.id}`;
-      } else {
-        const res = await signIn("credentials", {
-          email: data.email,
-          password: data.password,
-          loginMode,
-          redirect: false,
-          callbackUrl: safeCallbackUrl ?? adminUrl,
-        });
-
-        if (!res) {
-          toast.error("Login failed. Please try again.");
-          return;
-        }
-
-        if (res.error) {
-          toast.error(res.error === "CredentialsSignin" ? "Invalid email or password" : res.error);
-          return;
-        }
-
-        if (!keepSignedIn) {
-          await fetch("/api/auth/session-cookie", {
-            method: "POST",
-            credentials: "include",
-          }).catch(() => null);
-        }
-        nextUrl = safeCallbackUrl ?? adminUrl;
+      if (res.error) {
+        toast.error(res.error === "CredentialsSignin" ? "Invalid email or password" : res.error);
+        return;
       }
 
       toast.success("Successfully logged in");
-      window.location.assign(nextUrl);
-      return;
+      router.push(callbackUrl); // locale-aware push
     } catch (err: any) {
       toast.error(err?.message ?? "Login failed");
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // End loading state
     }
-  }, [callbackUrl, keepSignedIn, locale, loginMode]);
-
-  useEffect(() => {
-    reset({
-      email: defaultEmail,
-      password: defaultPassword,
-    });
-    autoSubmitTriggered.current = false;
-  }, [defaultEmail, defaultPassword, reset]);
-
-  useEffect(() => {
-    if (!autoSubmit || !defaultEmail || !defaultPassword || autoSubmitTriggered.current) {
-      return;
-    }
-
-    autoSubmitTriggered.current = true;
-    void handleSubmit(onSubmit)();
-  }, [autoSubmit, defaultEmail, defaultPassword, handleSubmit, onSubmit]);
+  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="mt-5 2xl:mt-7 space-y-4">
@@ -190,11 +123,7 @@ const LoginForm: React.FC<Props & { loginMode?: LoginMode }> = ({
 
       <div className="flex justify-between">
         <div className="flex gap-2 items-center">
-          <Checkbox
-            id="checkbox"
-            checked={keepSignedIn}
-            onCheckedChange={(checked) => setKeepSignedIn(checked === true)}
-          />
+          <Checkbox id="checkbox" defaultChecked />
           <Label htmlFor="checkbox">Keep Me Signed In</Label>
         </div>
       </div>

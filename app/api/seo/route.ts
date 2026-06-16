@@ -107,48 +107,12 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getClientSession } from "@/lib/client-auth-server";
 import { querySearchConsoleReports, resolveGscAccountForUser, serializeSeoReport, syncSearchConsole } from "@/lib/syncSearchConsole";
-
-function resolveRequestedAccount(params: {
-    accounts: any[];
-    gscSiteId?: string;
-    siteUrl?: string;
-}) {
-    const { accounts, gscSiteId, siteUrl } = params;
-    if (!Array.isArray(accounts) || accounts.length === 0) {
-        return null;
-    }
-
-    if (gscSiteId) {
-        return accounts.find((account) => String(account._id) === gscSiteId) || null;
-    }
-
-    if (siteUrl) {
-        return accounts.find((account) => account.siteUrl === siteUrl) || null;
-    }
-
-    return accounts[0];
-}
-
-async function resolveAuthenticatedUserId() {
-    const clientSession = await getClientSession();
-    if (clientSession?.user?.id) {
-        return clientSession.user.id;
-    }
-
-    const session = await getServerSession(authOptions);
-    if (session?.user?.id) {
-        return session.user.id;
-    }
-
-    return null;
-}
 
 export async function POST(req: Request) {
     try {
-        const callerId = await resolveAuthenticatedUserId();
-        if (!callerId) {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
             return NextResponse.json(
                 { ok: false, error: "Not authenticated" },
                 { status: 401 }
@@ -164,10 +128,7 @@ export async function POST(req: Request) {
             rowLimit,
             dimensions,
             gscSiteId,
-            targetUserId,
         } = body;
-
-        const userId = targetUserId || callerId;
 
         if (!startDate || !endDate) {
             return NextResponse.json(
@@ -176,14 +137,9 @@ export async function POST(req: Request) {
             );
         }
 
-        const { accounts } = await resolveGscAccountForUser(userId);
-        const requestedAccount = resolveRequestedAccount({
-            accounts,
-            gscSiteId,
-            siteUrl: rawSiteUrl,
-        });
-        const siteUrl = requestedAccount?.siteUrl;
-        const accountId = requestedAccount?._id ? String(requestedAccount._id) : undefined;
+        const { account } = await resolveGscAccountForUser(session.user.id);
+        const siteUrl = rawSiteUrl || account?.siteUrl;
+        const accountId = gscSiteId || (account?._id ? String(account._id) : undefined);
 
         if (!siteUrl || !accountId) {
             return NextResponse.json(
@@ -193,7 +149,7 @@ export async function POST(req: Request) {
         }
 
         const result = await syncSearchConsole({
-            userId,
+            userId: session.user.id,
             gscAccountId: accountId,
             siteUrl,
             startDate,
@@ -221,8 +177,8 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
     try {
-        const callerId = await resolveAuthenticatedUserId();
-        if (!callerId) {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
             return NextResponse.json(
                 { ok: false, error: "Not authenticated" },
                 { status: 401 }
@@ -234,20 +190,11 @@ export async function GET(req: Request) {
         const start = url.searchParams.get("start") ?? undefined;
         const end = url.searchParams.get("end") ?? undefined;
         const pageContains = url.searchParams.get("pageContains") ?? undefined;
-        const targetUserId = url.searchParams.get("targetUserId") ?? undefined;
         const limit = Number(url.searchParams.get("limit") ?? 100);
         const page = Number(url.searchParams.get("page") ?? 0);
 
-        const userId = targetUserId || callerId;
-
-        const gscSiteId = url.searchParams.get("gscSiteId") ?? undefined;
-        const { accounts } = await resolveGscAccountForUser(userId);
-        const requestedAccount = resolveRequestedAccount({
-            accounts,
-            gscSiteId,
-            siteUrl: rawSiteUrl,
-        });
-        const siteUrl = requestedAccount?.siteUrl;
+        const { account } = await resolveGscAccountForUser(session.user.id);
+        const siteUrl = rawSiteUrl || account?.siteUrl;
 
         if (!siteUrl) {
             return NextResponse.json(
@@ -257,7 +204,7 @@ export async function GET(req: Request) {
         }
 
         const rows = await querySearchConsoleReports({
-            userId,
+            userId: session.user.id,
             siteUrl,
             start,
             end,

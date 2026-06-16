@@ -2,7 +2,6 @@
 import connectDB from "@/lib/mongodb";
 import Account from "@/models/Account";
 import AdAccount from "@/models/AdAccount";
-import { getMetaGraphApiBase } from "@/lib/meta-api";
 
 type FBAdAccount = {
   id: string;
@@ -16,7 +15,7 @@ type FBAdAccount = {
 async function fetchUserAdAccountsFromFacebook(userAccessToken: string) {
   const collected: FBAdAccount[] = [];
   let url =
-    `${getMetaGraphApiBase()}/me/adaccounts` +
+    `https://graph.facebook.com/v19.0/me/adaccounts` +
     `?access_token=${encodeURIComponent(userAccessToken)}` +
     `&fields=${encodeURIComponent("id,name,account_status,currency,timezone_name")}`;
 

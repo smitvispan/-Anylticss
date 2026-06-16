@@ -7,7 +7,6 @@ import { Ellipsis } from "lucide-react";
 import { usePathname } from "@/components/navigation";
 
 import { cn } from "@/lib/utils";
-import { useClientSession } from "@/providers/client-session.provider";
 import { getMenuList } from "@/lib/menus";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -51,8 +50,7 @@ import { getLangDir } from 'rtl-detect';
 export function MenuDragAble() {
     const t = useTranslations("Menu")
     const pathname = usePathname();
-    const session = useClientSession();
-    const menuList = getMenuList(pathname, t, session?.user?.role);
+    const menuList = getMenuList(pathname, t);
     const [config, setConfig] = useConfig()
     const collapsed = config.collapsed
 
@@ -165,7 +163,7 @@ export function MenuDragAble() {
                                                             <Tooltip delayDuration={100}>
                                                                 <TooltipTrigger asChild>
 
-                                                                    <MenuItem label={label} icon={icon} href={href} active={active} id={id} collapsed={collapsed} />
+                                                                <MenuItem label={label} icon={icon} href={href} active={active} id={id} collapsed={collapsed} />
                                                                 </TooltipTrigger>
                                                                 {collapsed && (
                                                                     <TooltipContent side="right">

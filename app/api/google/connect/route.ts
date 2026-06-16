@@ -1,37 +1,11 @@
 import { NextResponse } from "next/server";
-import { getRequiredEnv } from "@/lib/env";
-import {
-  ConnectionOAuthError,
-  encodeConnectionOAuthState,
-  resolveConnectionContext,
-} from "@/lib/connection-oauth";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
+  const adminId = url.searchParams.get("adminId");
 
-  const redirectUri = getRequiredEnv("GOOGLE_REDIRECT_URL");
-  const clientId = getRequiredEnv("GOOGLE_CLIENT_ID");
-  let state = "";
-
-  try {
-    const context = await resolveConnectionContext({
-      requestedOwnerId: url.searchParams.get("adminId"),
-      requestedWorkspaceId: url.searchParams.get("workspaceId"),
-      requestedLocale: url.searchParams.get("locale"),
-    });
-
-    state = encodeConnectionOAuthState({
-      ownerId: context.ownerId,
-      workspaceId: context.workspaceId,
-      locale: context.locale,
-    });
-  } catch (error: any) {
-    const status = error instanceof ConnectionOAuthError ? error.status : 500;
-    return NextResponse.json(
-      { error: error?.message || "Unable to start Google connection" },
-      { status }
-    );
-  }
+  const redirectUri = process.env.GOOGLE_REDIRECT_URL!;
+  const clientId = process.env.GOOGLE_CLIENT_ID!;
 
   const scopes = [
     "https://www.googleapis.com/auth/adwords",
@@ -40,7 +14,7 @@ export async function GET(req: Request) {
     "https://www.googleapis.com/auth/webmasters.readonly",
     "email",
     "profile",
-    "openid",
+    "openid"
   ].join(" ");
 
   const oauthUrl =
@@ -50,7 +24,7 @@ export async function GET(req: Request) {
     `&response_type=code` +
     `&access_type=offline` +
     `&prompt=consent` +
-    `&state=${encodeURIComponent(state)}` +
+    `&state=${adminId}` +               // ← pass adminId here
     `&scope=${encodeURIComponent(scopes)}`;
 
   return NextResponse.redirect(oauthUrl);

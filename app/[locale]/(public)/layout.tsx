@@ -6,21 +6,16 @@ import DashCodeSidebar from "@/components/partials/sidebar";
 import ThemeCustomize from "@/components/partials/customizer";
 import PublicHeader from "@/components/partials/header/public-header";
 import PublicFooter from "@/components/partials/footer/public-footer";
-import { getClientSession } from "@/lib/client-auth-server";
-import { ClientSessionProvider } from "@/providers/client-session.provider";
 
-export default async function PublicLayout({ children }: { children: ReactNode }) {
-  const clientSession = await getClientSession();
+export default function PublicLayout({ children }: { children: ReactNode }) {
 
   return (
-    <ClientSessionProvider session={clientSession}>
-      <LayoutProvider>
-        <ThemeCustomize />
-        <PublicHeader />
-        <DashCodeSidebar />
-        <LayoutContentProvider>{children}</LayoutContentProvider>
-        <PublicFooter />
-      </LayoutProvider>
-    </ClientSessionProvider>
+    <LayoutProvider>
+      <ThemeCustomize />
+      <PublicHeader />
+      <DashCodeSidebar />
+      <LayoutContentProvider>{children}</LayoutContentProvider>
+      <PublicFooter />
+    </LayoutProvider>
   );
 }

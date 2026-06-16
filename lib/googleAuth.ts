@@ -1,7 +1,6 @@
 import connectDB from "@/lib/mongodb";
 import GoogleAdsAccount, { IGoogleAdsAccount } from "@/models/GoogleAdsAccount";
 import GoogleSearchConsoleAccount, { IGoogleSearchConsoleAccount } from "@/models/GoogleSearchConsoleAccount";
-import GoogleUser from "@/models/GoogleUser";
 
 type RefreshSource = {
   clientId?: string | null;
@@ -20,17 +19,10 @@ function pickEnv(keys: string[]) {
   return "";
 }
 
-function normalizeExpiresAt(expiresAt?: number | null) {
-  if (!expiresAt || Number.isNaN(Number(expiresAt))) return null;
-  const numeric = Number(expiresAt);
-  return numeric > 1_000_000_000_000 ? Math.floor(numeric / 1000) : Math.floor(numeric);
-}
-
 function tokenIsValid(expiresAt?: number | null) {
-  const normalized = normalizeExpiresAt(expiresAt);
-  if (!normalized) return false;
+  if (!expiresAt) return false;
   const now = Date.now() / 1000;
-  return normalized > now + 60; // 1 minute buffer
+  return expiresAt > now + 60; // 1 minute buffer
 }
 
 export async function refreshGoogleAccessToken(
@@ -80,24 +72,6 @@ type MinimalAccount = Pick<
 > &
   Partial<IGoogleAdsAccount>;
 
-type MinimalGoogleUser = {
-  _id: unknown;
-  accessToken?: string | null;
-  refreshToken?: string | null;
-  expiresAt?: number | null;
-};
-
-async function loadLinkedGoogleUser(googleUserId?: unknown): Promise<MinimalGoogleUser | null> {
-  if (!googleUserId) return null;
-  return GoogleUser.findById(googleUserId)
-    .select({ _id: 1, accessToken: 1, refreshToken: 1, expiresAt: 1 })
-    .lean<MinimalGoogleUser | null>();
-}
-
-function canUseEnvRefreshFallback(account: { adminId?: unknown; googleUserId?: unknown }) {
-  return Boolean(account.adminId || account.googleUserId);
-}
-
 /**
  * Ensures a valid Google Ads access token for a given account document or id.
  * If the token is missing/expired, it will be refreshed and persisted.
@@ -117,49 +91,21 @@ export async function ensureGoogleAdsAccessToken(
     throw new Error("Google Ads account not found");
   }
 
-  const linkedGoogleUser = await loadLinkedGoogleUser(account.googleUserId);
-
   if (!opts?.forceRefresh && account.accessToken && tokenIsValid(account.expiresAt)) {
     return account.accessToken;
   }
 
-  if (
-    !opts?.forceRefresh &&
-    linkedGoogleUser?.accessToken &&
-    tokenIsValid(linkedGoogleUser.expiresAt)
-  ) {
-    return linkedGoogleUser.accessToken;
-  }
-
   const refreshToken =
     account.refreshToken ||
-    linkedGoogleUser?.refreshToken ||
-    (canUseEnvRefreshFallback(account)
-      ? process.env.GOOGLE_ADS_REFRESH_TOKEN || process.env.REFRESH_TOKEN
-      : "");
+    process.env.GOOGLE_ADS_REFRESH_TOKEN ||
+    process.env.REFRESH_TOKEN;
 
-  if (!refreshToken) {
-    throw new Error("Google Ads account is not connected. Missing refresh token.");
-  }
-
-  const { accessToken, expiresAt } = await refreshGoogleAccessToken(refreshToken || "", {
-    clientId: process.env.GOOGLE_ADS_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_ADS_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET
-  });
-
-  const normalizedExpiresAt = normalizeExpiresAt(expiresAt);
+  const { accessToken, expiresAt } = await refreshGoogleAccessToken(refreshToken || "");
 
   await GoogleAdsAccount.updateOne(
     { _id: account._id },
-    { $set: { accessToken, expiresAt: normalizedExpiresAt, refreshToken } }
+    { $set: { accessToken, expiresAt, refreshToken } }
   );
-
-  if (linkedGoogleUser?._id) {
-    await GoogleUser.updateOne(
-      { _id: linkedGoogleUser._id },
-      { $set: { accessToken, expiresAt: normalizedExpiresAt, refreshToken } }
-    );
-  }
 
   return accessToken;
 }
@@ -198,49 +144,21 @@ export async function ensureSearchConsoleAccessToken(
     throw new Error("Search Console account not found");
   }
 
-  const linkedGoogleUser = await loadLinkedGoogleUser(account.googleUserId);
-
   if (!opts?.forceRefresh && account.accessToken && tokenIsValid(account.expiresAt)) {
     return account.accessToken;
   }
 
-  if (
-    !opts?.forceRefresh &&
-    linkedGoogleUser?.accessToken &&
-    tokenIsValid(linkedGoogleUser.expiresAt)
-  ) {
-    return linkedGoogleUser.accessToken;
-  }
-
   const refreshToken =
     account.refreshToken ||
-    linkedGoogleUser?.refreshToken ||
-    (canUseEnvRefreshFallback(account)
-      ? process.env.GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN || process.env.REFRESH_TOKEN
-      : "");
+    process.env.GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN ||
+    process.env.REFRESH_TOKEN;
 
-  if (!refreshToken) {
-    throw new Error("Search Console account is not connected. Missing refresh token.");
-  }
-
-  const { accessToken, expiresAt } = await refreshGoogleAccessToken(refreshToken || "", {
-    clientId: process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_ADS_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET
-  });
-
-  const normalizedExpiresAt = normalizeExpiresAt(expiresAt);
+  const { accessToken, expiresAt } = await refreshGoogleAccessToken(refreshToken || "");
 
   await GoogleSearchConsoleAccount.updateOne(
     { _id: account._id },
-    { $set: { accessToken, expiresAt: normalizedExpiresAt, refreshToken } }
+    { $set: { accessToken, expiresAt, refreshToken } }
   );
-
-  if (linkedGoogleUser?._id) {
-    await GoogleUser.updateOne(
-      { _id: linkedGoogleUser._id },
-      { $set: { accessToken, expiresAt: normalizedExpiresAt, refreshToken } }
-    );
-  }
 
   return accessToken;
 }

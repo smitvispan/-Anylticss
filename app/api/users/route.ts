@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { isValidObjectId } from "mongoose";
 import connectDB from "@/lib/mongodb";
-import { resolveClientIdentifiers } from "@/lib/client-identifiers";
 import User from "@/models/User";
 
 function readAccessToken(req: Request) {
@@ -70,7 +69,7 @@ export async function GET(req: Request) {
       isAdmin: !!user.isAdmin,
       client_id: user.client_id || null,
       contact_id: user.contact_id || null,
-      ERP_token: null,
+      ERP_token: user.ERP_token || null,
       mainPage: user.mainPage ? String(user.mainPage) : null,
       mainInstagram: user.mainInstagram ? String(user.mainInstagram) : null,
       mainAd: user.mainAd ? String(user.mainAd) : null,
@@ -118,15 +117,16 @@ export async function POST(req: Request) {
 
     const client_id = typeof body.client_id === "string" ? body.client_id.trim() : "";
     const contact_id = typeof body.contact_id === "string" ? body.contact_id.trim() : "";
+    const ERP_token = typeof body.ERP_token === "string" ? body.ERP_token.trim() : "";
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const email =
       typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 
-    if (!name || !email) {
+    if (!client_id || !contact_id || !ERP_token || !name || !email) {
       return NextResponse.json(
         {
           ok: false,
-          error: "name and email are required",
+          error: "client_id, contact_id, ERP_token, name, and email are required",
         },
         { status: 400 }
       );
@@ -136,20 +136,14 @@ export async function POST(req: Request) {
 
     const existing = await User.findOne({ email }).lean();
     if (existing) {
-      const identifiers = await resolveClientIdentifiers({
-        clientId: client_id || existing.client_id || null,
-        contactId: contact_id || existing.contact_id || null,
-        isAdmin: !!existing.isAdmin,
-      });
-
       const updated = await User.findByIdAndUpdate(
         existing._id,
         {
           $set: {
             name,
-            client_id: identifiers.client_id,
-            contact_id: identifiers.contact_id,
-            ERP_token: identifiers.ERP_token,
+            client_id,
+            contact_id,
+            ERP_token,
           },
         },
         { new: true }
@@ -171,7 +165,7 @@ export async function POST(req: Request) {
             email: updated.email || null,
             client_id: updated.client_id || null,
             contact_id: updated.contact_id || null,
-            ERP_token: null,
+            ERP_token: updated.ERP_token || null,
           },
           updated: true,
         },
@@ -179,19 +173,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const identifiers = await resolveClientIdentifiers({
-      clientId: client_id || null,
-      contactId: contact_id || null,
-      isAdmin: false,
-    });
-
-    const user = await User.create({
-      name,
-      email,
-      client_id: identifiers.client_id,
-      contact_id: identifiers.contact_id,
-      ERP_token: identifiers.ERP_token,
-    });
+    const user = await User.create({ name, email, client_id, contact_id, ERP_token });
 
     return NextResponse.json(
       {
@@ -202,7 +184,7 @@ export async function POST(req: Request) {
           email: user.email || null,
           client_id: user.client_id || null,
           contact_id: user.contact_id || null,
-          ERP_token: null,
+          ERP_token: user.ERP_token || null,
         },
         created: true,
       },

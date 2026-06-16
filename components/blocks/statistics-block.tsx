@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTheme } from "next-themes";
-const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
+const Chart = dynamic(() => import("react-apexcharts"));
 interface StatsBlock {
   className?: string;
   title: string;

@@ -10,7 +10,7 @@ import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 // language
 import { getLangDir } from "rtl-detect";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages, getLocale } from "next-intl/server";
+import { getMessages } from "next-intl/server";
 import DirectionProvider from "@/providers/direction-provider";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -22,11 +22,13 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({
   children,
+  params,
 }: Readonly<{
   children: React.ReactNode;
+  params: Promise<{ locale: string }>;
 }>) {
-  const locale = await getLocale();
-  const messages = await getMessages({ locale });
+  const { locale } = await params;
+  const messages = await getMessages();
   const direction = getLangDir(locale);
 
   return (
@@ -35,8 +37,8 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages} locale={locale}>
           <ThemeProvider
             attribute="class"
-            defaultTheme="light"
-            enableSystem={false}
+            defaultTheme="system"
+            enableSystem
             disableTransitionOnChange
           >
             <MountedProvider>

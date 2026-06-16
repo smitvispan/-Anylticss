@@ -197,7 +197,7 @@ async function fetchAdsetInsightsPage(
 ): Promise<{ rows: FBInsightsRow[]; nextUrl: string | null }> {
   const u = next
     ? new URL(next)
-    : new URL(`${getMetaGraphApiBase()}/${encodeURIComponent(fbAdAccountId)}/insights`);
+    : new URL(`https://graph.facebook.com/v19.0/${encodeURIComponent(fbAdAccountId)}/insights`);
 
   if (!next) {
     u.searchParams.set("access_token", accessToken);
@@ -478,4 +478,3 @@ export async function getAdInsightsRows(fields: FieldId[], id: Params) {
 
   return rows;
 }
-import { getMetaGraphApiBase } from "@/lib/meta-api";

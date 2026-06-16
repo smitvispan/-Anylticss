@@ -16,7 +16,7 @@ export default function NotFound() {
             </div>
             <div className="max-w-[300px] mx-auto w-full">
                 <Link
-                    href="/"
+                    href="/analytics"
                     className="btn bg-default-300 hover:bg-default-300/50 transition-all duration-150 block text-center rounded-md py-2"
                 >
                     Go to homepage

@@ -3,33 +3,31 @@ import Credentials from "next-auth/providers/credentials";
 import Facebook from "next-auth/providers/facebook";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
-import { getServerSession } from "next-auth";
+import { randomBytes } from "crypto";
 
-import { resolveClientIdentifiers } from "@/lib/client-identifiers";
 import connectDB from "@/lib/mongodb";
 import Admin from "@/models/Admin";
-import User from "@/models/User";
 
-function isBcryptHash(value: string | null | undefined) {
-  return typeof value === "string" && /^\$2[aby]\$\d{2}\$/.test(value);
+import { getServerSession } from "next-auth";
+
+function toDateFromEpochSeconds(v: unknown): Date | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? new Date(n * 1000) : null;
 }
 
-async function verifyPassword(input: string, stored: string | null | undefined) {
-  if (!stored) return false;
-  if (isBcryptHash(stored)) return bcrypt.compare(input, stored);
-  return stored === input;
+function generateTempPassword(length = 18) {
+  const alphabet =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*()-_=+";
+  const bytes = randomBytes(length);
+  let out = "";
+  for (let i = 0; i < length; i++)
+    out += alphabet[bytes[i] % alphabet.length];
+  return out;
 }
 
-async function migrateUserPasswordIfNeeded(
-  userId: string,
-  password: string,
-  stored: string | null | undefined
-) {
-  if (!stored || isBcryptHash(stored)) return;
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  await User.findByIdAndUpdate(userId, { password: hashedPassword }).catch(() => null);
-}
+// ----------------------------------------------------------------------------
+// AUTH OPTIONS
+// ----------------------------------------------------------------------------
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -38,88 +36,60 @@ export const authOptions: NextAuthOptions = {
 
   providers: [
     Credentials({
-      name: "Email Login",
+      name: "Admin Login",
       credentials: {
         email: { label: "Email" },
         password: { label: "Password", type: "password" },
-        loginMode: { label: "Login Mode" },
       },
 
       async authorize(credentials) {
+      console.log("🔥 AUTHORIZE STARTED at:", new Date().toISOString());
+      console.log("Credentials:", credentials);
+      
+      try {
         await connectDB();
-
+        console.log("✅ DB Connected");
+        
         if (!credentials?.email || !credentials?.password) {
+          console.log("❌ Missing email or password");
           return null;
         }
-
-        const email = credentials.email.toLowerCase().trim();
-        const password = credentials.password;
-        const loginMode =
-          ["admin", "user"].includes(credentials.loginMode)
-            ? credentials.loginMode
-            : null;
-
-        const admin = await Admin.findOne({ email }).lean();
-        if (admin) {
-          if (loginMode !== "admin") {
-            return null;
-          }
-          const isValidAdminPassword = await verifyPassword(password, admin.password);
-          if (isValidAdminPassword) {
-            return {
-              id: String(admin._id),
-              email: admin.email,
-              role: admin.role || "admin",
-            };
-          }
-        }
-
-        const user = await User.findOne({ email, isAdmin: false })
-          .select({ _id: 1, email: 1, name: 1, password: 1, client_id: 1, contact_id: 1, ERP_token: 1, role: 1 })
-          .lean();
-
-        if (!user) {
+        
+        const admin = await Admin.findOne({ email: credentials.email.toLowerCase() });
+        console.log("Admin found:", admin ? "Yes" : "No");
+        
+        if (!admin) {
+          console.log("❌ Admin not found for email:", credentials.email);
           return null;
         }
-
-        const userRole = user.role || "client";
-
-        if (userRole !== "user") {
+        
+        console.log("🔐 Comparing password...");
+        const isValid = await bcrypt.compare(credentials.password, admin.password);
+        console.log("Password valid:", isValid);
+        
+        if (!isValid) {
+          console.log("❌ Invalid password");
           return null;
         }
-
-        if (loginMode !== userRole) {
-          return null;
-        }
-
-        const isValidUserPassword = await verifyPassword(password, user.password);
-        if (!isValidUserPassword) {
-          return null;
-        }
-
-        await migrateUserPasswordIfNeeded(String(user._id), password, user.password);
-        const identifiers = await resolveClientIdentifiers({
-          clientId: user.client_id,
-          contactId: user.contact_id,
-          isAdmin: false,
-        });
-        if (
-          identifiers.client_id !== (user.client_id ?? null) ||
-          identifiers.contact_id !== (user.contact_id ?? null) ||
-          user.ERP_token
-        ) {
-          await User.findByIdAndUpdate(String(user._id), identifiers).catch(() => null);
-        }
-
+        
+        console.log("✅ Login successful for:", admin.email);
         return {
-          id: String(user._id),
-          email: user.email,
-          name: user.name ?? undefined,
-          role: userRole,
+          id: admin._id.toString(),
+          email: admin.email,
+          role: admin.role || "admin",
         };
-      },
+      } catch (error) {
+        console.error("🔥 Error in authorize:", error);
+        return null;
+      }
+    },
+
+      
     }),
 
+    // ----------------------------------------------------------------------
+    // ⭐ FACEBOOK LOGIN (Optional)
+    // ----------------------------------------------------------------------
     Facebook({
       clientId: process.env.FACEBOOK_CLIENT_ID!,
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
@@ -138,6 +108,9 @@ export const authOptions: NextAuthOptions = {
       },
     }),
 
+    // ----------------------------------------------------------------------
+    // ⭐ GOOGLE LOGIN (Optional)
+    // ----------------------------------------------------------------------
     GoogleProvider({
       clientId: process.env.GOOGLE_ADS_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_ADS_CLIENT_SECRET!,
@@ -160,49 +133,68 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
+  // ----------------------------------------------------------------------------
+  // CALLBACKS
+  // ----------------------------------------------------------------------------
   callbacks: {
+    // ----------------------------------------------------------------------
+    // ✔ JWT CALLBACK → Store admin info
+    // ----------------------------------------------------------------------
     async jwt({ token, user, account }) {
       if (user) {
-        token.id = (user as any).id ?? token.sub;
-        token.name = user.name;
+        token.id = (user as any).id;
         token.email = user.email;
         token.role = (user as any).role ?? "admin";
       }
 
+      // Store provider details if login is Facebook/Google
       if (account) {
         token.provider = account.provider;
+        // token.accessToken = account.access_token ?? null;
       }
 
       return token;
     },
 
+
+    // ----------------------------------------------------------------------
+    // ✔ SESSION CALLBACK → expose admin
+    // ----------------------------------------------------------------------
     async session({ session, token }) {
       const tokenData = token as Record<string, any>;
       (session as any).user = {
         ...(session.user || {}),
         id: tokenData.id as string | undefined,
-        name: tokenData.name as string | undefined,
         email: tokenData.email as string | undefined,
         role: tokenData.role as string | undefined,
       };
 
+      // Attach provider-based fields
       session.provider = tokenData.provider ?? null;
       session.accessToken = tokenData.accessToken ?? null;
 
       return session;
     },
 
+
+
+    // ----------------------------------------------------------------------
+    // ✔ REDIRECT AFTER LOGIN
+    // ----------------------------------------------------------------------
     async redirect({ url, baseUrl }) {
       if (url.startsWith("/")) return baseUrl + url;
       try {
         const u = new URL(url);
         if (u.origin === baseUrl) return url;
-      } catch { }
-      return `${baseUrl}/en/admin`;
+      } catch {}
+      return baseUrl + "/en/admin";
     },
   },
 };
 
+// ----------------------------------------------------------------------------
+// EXPORT HANDLER
+// ----------------------------------------------------------------------------
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
 export const auth = () => getServerSession(authOptions);

@@ -2,7 +2,6 @@
 import connectDB from "@/lib/mongodb";
 import Account from "@/models/Account";
 import Page from "@/models/Page";
-import { getMetaGraphApiBase } from "@/lib/meta-api";
 
 type FBPage = {
   id: string;
@@ -17,7 +16,7 @@ type FBPage = {
 
 async function fetchUserPagesFromFacebook(userAccessToken: string) {
   const collected: FBPage[] = [];
-  let url = `${getMetaGraphApiBase()}/me/accounts?access_token=${encodeURIComponent(
+  let url = `https://graph.facebook.com/v19.0/me/accounts?access_token=${encodeURIComponent(
     userAccessToken
   )}`;
 

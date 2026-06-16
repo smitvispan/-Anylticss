@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { usePathname, useSearchParams, useParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import HeaderContent from "./header-content";
 import ProfileInfo from "./profile-info";
 import ThemeSwitcher from "./theme-switcher";
@@ -10,49 +10,17 @@ import { SheetMenu } from "@/components/partials/sidebar/menu/sheet-menu";
 import HeaderLogo from "./header-logo";
 import HorizontalMenu from "./horizontal-menu";
 import DateRangeForm from "@/app/[locale]/(public)/analytics/[id]/page/_components/DateRangeForm";
-import { useSession } from "next-auth/react";
-import { useClientSession } from "@/providers/client-session.provider";
-import { useWorkspace } from "@/providers/workspace.provider";
 
 const PublicHeader = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const params = useParams();
-  const { data: nextAuthSession } = useSession();
-  const clientSession = useClientSession();
-  const workspace = useWorkspace();
-  const idFromUrl = params?.id as string | undefined;
-
-  const [dynamicRole, setDynamicRole] = React.useState<string | null>(null);
-  const [dynamicName, setDynamicName] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (idFromUrl && !workspace) {
-      fetch(`/api/client/user-info?id=${idFromUrl}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data?.role) setDynamicRole(data.role);
-          if (data?.name) setDynamicName(data.name);
-        })
-        .catch(() => null);
-    }
-  }, [idFromUrl, workspace]);
-
-  const isAnalyticsArea = (pathname || "").includes("/analytics/");
-  const session = isAnalyticsArea ? clientSession ?? nextAuthSession : nextAuthSession;
 
   const workspaceLabel = useMemo(() => {
     const current = pathname || "";
-    if (current.includes("/analytics")) {
-      const targetRole = workspace?.role || dynamicRole || session?.user?.role;
-      if (targetRole === 'admin') return "Admin Workspace";
-      if (targetRole === 'client') return "Client Workspace";
-      if (targetRole === 'user') return "User Workspace";
-      return "Analytics Workspace";
-    }
+    if (current.includes("/analytics")) return "Analytics workspace";
     if (current.includes("/reports")) return "Reports";
     return "Workspace";
-  }, [pathname, session, workspace, dynamicRole]);
+  }, [pathname]);
 
   const getPrevMonthRange = () => {
     const today = new Date();
@@ -79,12 +47,6 @@ const PublicHeader = () => {
           <div className="hidden items-center gap-2 rounded-full border border-slate-200/70 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-200/80 backdrop-blur lg:flex">
             <span className="h-2 w-2 rounded-full bg-sky-500" />
             {workspaceLabel}
-            {(workspace?.name || dynamicName) && (
-              <>
-                <span className="mx-1 text-slate-300">|</span>
-                <span className="text-slate-900 font-bold uppercase tracking-wider">{workspace?.name || dynamicName}</span>
-              </>
-            )}
           </div>
           <SidebarToggle />
         </div>

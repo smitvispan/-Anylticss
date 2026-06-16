@@ -15,15 +15,15 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { syncAdAccountsForAllUsers } from "@/lib/syncAdAccounts";
 import { syncAdAccountInsightsForAccount } from "@/lib/syncAdAccountInsights";
 import { getPreviousPeriod } from "@/lib/dateRanges";
 import AdFilters from "./_components/AdFilters";
 import connectDB from "@/lib/mongodb";
+import User from "@/models/User";
+import AdAccount from "@/models/AdAccount";
 import MetaAdset from "@/models/MetaAdset";
-import ReportAccountSwitcher from "@/components/report-account-switcher";
-import { resolveMetaAdOptionsForUser } from "@/lib/report-account-options";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,16 +99,11 @@ function getPrevMonthRange(): { start: string; end: string } {
 }
 
 function isValidDateInput(value?: string | null) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-
-  return (
-    date.getFullYear() === year &&
-    date.getMonth() === month - 1 &&
-    date.getDate() === day
-  );
+  if (!value) return false;
+  const match = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (!match) return false;
+  const d = new Date(value);
+  return !Number.isNaN(d.getTime());
 }
 
 function normalizeRange(
@@ -116,11 +111,11 @@ function normalizeRange(
   requestedEnd: string | undefined
 ): { start: string; end: string } {
   const defaults = getPrevMonthRange();
-  const today = new Date();
-  const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const start = isValidDateInput(requestedStart) ? (requestedStart as string) : defaults.start;
   const end = isValidDateInput(requestedEnd) ? (requestedEnd as string) : defaults.end;
-  if (start > end || end > todayDate) return defaults;
+  if (new Date(start).getTime() > new Date(end).getTime()) {
+    return defaults;
+  }
   return { start, end };
 }
 
@@ -181,8 +176,6 @@ type SearchParams = {
   end?: string;
   campaign?: string;
   adset?: string;
-  adAccountId?: string;
-  sourceId?: string;
 };
 
 type MetricRow = Record<string, unknown> & {
@@ -257,39 +250,6 @@ function summarizeBlock(block: MetricBlock | null) {
   );
 }
 
-// -- MOCK GENERATOR FOR DEMO --
-function generateMockAdsetDocs(since: string, until: string, multiplier: number = 1) {
-  const diffDays = Math.max(1, Math.floor((new Date(until).getTime() - new Date(since).getTime()) / (1000 * 60 * 60 * 24)));
-
-  const rows = [];
-  for (let i = 0; i <= diffDays; i++) {
-    rows.push({
-      spend: (Math.random() * 50 * multiplier).toFixed(2),
-      impressions: Math.floor(Math.random() * 5000 * multiplier),
-      clicks: Math.floor(Math.random() * 200 * multiplier),
-      reach: Math.floor(Math.random() * 4000 * multiplier),
-      ctr: (Math.random() * 5).toFixed(2),
-      cpc: (Math.random() * 1).toFixed(2),
-      cpm: (Math.random() * 10).toFixed(2),
-      offsite_conversion: Math.floor(Math.random() * 5 * multiplier),
-      conversions: Math.floor(Math.random() * 5 * multiplier),
-      inline_link_clicks: Math.floor(Math.random() * 100 * multiplier)
-    });
-  }
-
-  return [{
-    name: "Acme Retargeting Campaign",
-    adsetname: "Hot Leads Adset",
-    since,
-    until,
-    metric: {
-      since,
-      until,
-      metric: rows
-    }
-  }];
-}
-
 export default async function AnalyticsPublicDetail({
   params,
   searchParams,
@@ -297,44 +257,43 @@ export default async function AnalyticsPublicDetail({
   params: Promise<{ id: string; locale: string }>;
   searchParams: Promise<SearchParams>;
 }) {
-  const { id, locale } = await params;
-  if (!isValidObjectId(id)) redirect(`/${locale}/analytics`);
+  const { id } = await params;
+  if (!isValidObjectId(id)) notFound();
 
   const sp = await searchParams;
   await connectDB();
   const logCtx = `[MetaAds][user:${id}]`;
-  const initialAdState = await resolveMetaAdOptionsForUser(id, sp.adAccountId, sp.sourceId);
-  const user = initialAdState.user;
-  if (!user) redirect(`/${locale}/analytics`);
 
-  let adAccount = initialAdState.selected;
-  let adAccountOptions = initialAdState.options;
+  const user = await User.findById(id).select({ _id: 1, name: 1, email: 1, mainAd: 1 }).lean();
+  if (!user) notFound();
 
-  if (!adAccount && user.role !== "user") {
+  let adAccount = user.mainAd
+    ? await AdAccount.findById(user.mainAd).lean()
+    : await AdAccount.findOne({ userId: id }).lean();
+
+  if (!adAccount) {
     try {
       await syncAdAccountsForAllUsers();
-      const syncedAdState = await resolveMetaAdOptionsForUser(id, sp.adAccountId, sp.sourceId);
-      adAccount = syncedAdState.selected;
-      adAccountOptions = syncedAdState.options;
+      adAccount = await AdAccount.findOne({ userId: id }).lean();
     } catch (e) {
-      console.warn("Sync ad accounts failed, dropping to fallback.");
+      console.error("Sync ad accounts failed:", e);
     }
   }
 
   if (!adAccount) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 flex items-center justify-center p-6">
-        <Card className="max-w-md w-full border-0 shadow-xl bg-white dark:bg-gray-800">
-          <CardContent className="p-8 text-center">
-            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Target className="w-8 h-8 text-blue-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Account Not Linked</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm leading-relaxed">
-              There is no Meta Ads account linked to this profile. Please connect an ad account from the settings or contact your administrator.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        <div className="container mx-auto px-4 py-8">
+          <Card className="mt-6 border-border/40 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                <Target className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="mb-2 text-lg font-semibold">No Ad Account Found</h3>
+              <p className="text-muted-foreground">Please connect a Meta Ads account to view analytics.</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -367,7 +326,7 @@ export default async function AnalyticsPublicDetail({
         await syncAdAccountInsightsForAccount(adAccountId, { since, until });
         synced = true;
       } catch (e) {
-        console.warn("Sync insights failed, dropping to fallback.");
+        console.error("Sync insights failed:", e);
       }
       docs = await MetaAdset.find({ adAccountId, since, until }).lean();
     }
@@ -375,18 +334,10 @@ export default async function AnalyticsPublicDetail({
     return { docs, synced };
   };
 
-  let [{ docs: currentDocs, synced: syncedCurrent }, { docs: compareDocs, synced: syncedCompare }] = await Promise.all([
+  const [{ docs: currentDocs, synced: syncedCurrent }, { docs: compareDocs, synced: syncedCompare }] = await Promise.all([
     ensureRange(startDate, endDate),
     ensureRange(prevStart, prevEnd),
   ]);
-
-  // -- INJECT MOCK DATA IF EMPTY --
-  if (currentDocs.length === 0) {
-    currentDocs = generateMockAdsetDocs(startDate, endDate, 1.2);
-  }
-  if (compareDocs.length === 0) {
-    compareDocs = generateMockAdsetDocs(prevStart, prevEnd, 1.0);
-  }
 
   const safeInsights = [...currentDocs, ...compareDocs].map(mapMetaAdsetDoc).filter(Boolean);
 
@@ -531,7 +482,7 @@ export default async function AnalyticsPublicDetail({
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
+        
         {/* Header Section with Account Owner Info */}
         <div className="mb-10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -542,7 +493,7 @@ export default async function AnalyticsPublicDetail({
                   Comprehensive performance insights for your advertising campaigns
                 </p>
               </div>
-
+              
               {/* Account Owner Info Card */}
               <Card className="border-0 bg-gradient-to-r from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 shadow-md max-w-2xl">
                 <CardContent className="p-3">
@@ -553,7 +504,7 @@ export default async function AnalyticsPublicDetail({
                           {(user.name?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
                         </span>
                       </div>
-
+                      
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white tracking-tight truncate">
@@ -569,7 +520,7 @@ export default async function AnalyticsPublicDetail({
                         </p>
                       </div>
                     </div>
-
+                    
                     <div className="hidden md:flex items-center gap-2 ml-4">
                       <div className="w-px h-4 bg-border/40"></div>
                       <div className="text-right">
@@ -583,39 +534,17 @@ export default async function AnalyticsPublicDetail({
                 </CardContent>
               </Card>
             </div>
-
-            <div className="flex flex-col items-stretch gap-3 sm:items-end">
-              <ReportAccountSwitcher
-                label="Connected Account"
-                paramKey="sourceId"
-                value={String(initialAdState.selectedSource?._id || "")}
-                clearParamKeys={["adAccountId", "campaign", "adset"]}
-                options={initialAdState.sourceOptions.map((entry: any) => ({
-                  id: String(entry._id),
-                  label: entry.name || entry.email || `Account ${String(entry._id).slice(-6)}`,
-                }))}
-              />
-              <ReportAccountSwitcher
-                label="Meta Ads Account"
-                paramKey="adAccountId"
-                value={String(adAccount._id)}
-                clearParamKeys={["campaign", "adset"]}
-                options={adAccountOptions.map((account: any) => ({
-                  id: String(account._id),
-                  label: account.name || account.adAccountId || `Ad Account ${String(account._id).slice(-6)}`,
-                }))}
-              />
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <Badge className="border-primary/20 bg-primary/5 text-primary px-3 py-1 h-fit mt-1">
-                  <Sparkles className="mr-2 h-3 w-3" />
-                  Real-time Insights
-                </Badge>
-                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                  <Zap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-xs text-blue-700 dark:text-blue-300">
-                    {syncedSomething ? "Data refreshed" : "Live data"}
-                  </span>
-                </div>
+            
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <Badge className="border-primary/20 bg-primary/5 text-primary px-3 py-1 h-fit mt-1">
+                <Sparkles className="mr-2 h-3 w-3" />
+                Real-time Insights
+              </Badge>
+              <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                <Zap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs text-blue-700 dark:text-blue-300">
+                  {syncedSomething ? "Data refreshed" : "Live data"}
+                </span>
               </div>
             </div>
           </div>
@@ -831,7 +760,7 @@ export default async function AnalyticsPublicDetail({
                   </div>
                 </div>
                 <div className="mt-4 h-2 w-full rounded-full bg-muted overflow-hidden">
-                  <div
+                  <div 
                     className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 group-hover:from-blue-300 group-hover:to-blue-500 transition-all duration-500"
                     style={{ width: `${Math.min(currentMetrics.ctr * 10, 100)}%` }}
                   />
@@ -856,7 +785,7 @@ export default async function AnalyticsPublicDetail({
                   </div>
                 </div>
                 <div className="mt-4 h-2 w-full rounded-full bg-muted overflow-hidden">
-                  <div
+                  <div 
                     className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-600 group-hover:from-orange-300 group-hover:to-orange-500 transition-all duration-500"
                     style={{ width: `${Math.min(currentMetrics.cpc, 100)}%` }}
                   />
@@ -881,7 +810,7 @@ export default async function AnalyticsPublicDetail({
                   </div>
                 </div>
                 <div className="mt-4 h-2 w-full rounded-full bg-muted overflow-hidden">
-                  <div
+                  <div 
                     className="h-full rounded-full bg-gradient-to-r from-purple-400 to-purple-600 group-hover:from-purple-300 group-hover:to-purple-500 transition-all duration-500"
                     style={{ width: `${Math.min(currentMetrics.cpm, 100)}%` }}
                   />
@@ -913,9 +842,9 @@ export default async function AnalyticsPublicDetail({
           <h2 className="mb-4 text-xl font-semibold text-foreground">Engagement Metrics</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              {
-                title: "Link Clicks",
-                value: currentMetrics.link_clicks,
+              { 
+                title: "Link Clicks", 
+                value: currentMetrics.link_clicks, 
                 change: changes.link_clicks,
                 color: "from-blue-400 to-blue-600",
                 hoverColor: "from-blue-300 to-blue-500",
@@ -923,9 +852,9 @@ export default async function AnalyticsPublicDetail({
                 borderColor: "border-blue-300/50",
                 icon: <MousePointer className="h-5 w-5 text-blue-600" />
               },
-              {
-                title: "Post Engagements",
-                value: currentMetrics.post_engagements,
+              { 
+                title: "Post Engagements", 
+                value: currentMetrics.post_engagements, 
                 change: changes.post_engagements,
                 color: "from-orange-400 to-orange-600",
                 hoverColor: "from-orange-300 to-orange-500",
@@ -933,9 +862,9 @@ export default async function AnalyticsPublicDetail({
                 borderColor: "border-orange-300/50",
                 icon: <BarChart className="h-5 w-5 text-orange-600" />
               },
-              {
-                title: "Video Views",
-                value: currentMetrics.video_views,
+              { 
+                title: "Video Views", 
+                value: currentMetrics.video_views, 
                 change: changes.video_views,
                 color: "from-purple-400 to-purple-600",
                 hoverColor: "from-purple-300 to-purple-500",
@@ -943,9 +872,9 @@ export default async function AnalyticsPublicDetail({
                 borderColor: "border-purple-300/50",
                 icon: <Eye className="h-5 w-5 text-purple-600" />
               },
-              {
-                title: "Reach",
-                value: currentMetrics.reach,
+              { 
+                title: "Reach", 
+                value: currentMetrics.reach, 
                 change: changes.reach,
                 color: "from-green-400 to-green-600",
                 hoverColor: "from-green-300 to-green-500",
@@ -970,7 +899,7 @@ export default async function AnalyticsPublicDetail({
                     </p>
                   </div>
                   <div className="mt-4 h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div
+                    <div 
                       className={`h-full rounded-full bg-gradient-to-r ${metric.color} group-hover:${metric.hoverColor} transition-all duration-500`}
                       style={{ width: `${Math.min((metric.value / Math.max(currentMetrics.impressions, 1)) * 100, 100)}%` }}
                     />
@@ -999,7 +928,7 @@ export default async function AnalyticsPublicDetail({
                     </div>
                   </div>
                 </div>
-
+                
                 {/* <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/20 group-hover:bg-green-200 dark:group-hover:bg-green-800/30 transition-colors">
@@ -1011,7 +940,7 @@ export default async function AnalyticsPublicDetail({
                     </div>
                   </div>
                 </div> */}
-
+                
                 {/* <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/20 group-hover:bg-purple-200 dark:group-hover:bg-purple-800/30 transition-colors">
@@ -1023,7 +952,7 @@ export default async function AnalyticsPublicDetail({
                     </div>
                   </div>
                 </div> */}
-
+                
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/20 group-hover:bg-orange-200 dark:group-hover:bg-orange-800/30 transition-colors">
@@ -1156,11 +1085,12 @@ export default async function AnalyticsPublicDetail({
                             <span className="font-medium">{formatNumber(row.clicks)}</span>
                           </td>
                           <td className="whitespace-nowrap px-6 py-4 text-right">
-                            <Badge
-                              className={`border-0 transition-all duration-300 ${row.ctr > 2 ? 'bg-green-100 text-green-700 dark:bg-green-900/20 group-hover/row:bg-green-200 dark:group-hover/row:bg-green-800/30' :
+                            <Badge 
+                              className={`border-0 transition-all duration-300 ${
+                                row.ctr > 2 ? 'bg-green-100 text-green-700 dark:bg-green-900/20 group-hover/row:bg-green-200 dark:group-hover/row:bg-green-800/30' :
                                 row.ctr > 1 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 group-hover/row:bg-yellow-200 dark:group-hover/row:bg-yellow-800/30' :
-                                  'bg-red-100 text-red-700 dark:bg-red-900/20 group-hover/row:bg-red-200 dark:group-hover/row:bg-red-800/30'
-                                }`}
+                                'bg-red-100 text-red-700 dark:bg-red-900/20 group-hover/row:bg-red-200 dark:group-hover/row:bg-red-800/30'
+                              }`}
                             >
                               {row.ctr.toFixed(2)}%
                             </Badge>

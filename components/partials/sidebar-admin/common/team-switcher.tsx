@@ -47,8 +47,46 @@ import { useConfig } from "@/hooks/use-config";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { motion } from "framer-motion";
 import { useMenuHoverConfig } from "@/hooks/use-menu-hover";
-import { useParams, useRouter } from "next/navigation";
-import type { SwitcherItem } from "@/lib/switcher-types";
+
+const groups = [
+    {
+        label: "Pages",
+        teams: [
+            {
+                label: "Designing Workspace",
+                value: "personal",
+            },
+        ],
+    },
+    {
+        label: "Instagram",
+        teams: [
+            {
+                label: "123",
+                value: "acme-inc-01",
+            },
+            {
+                label: "456",
+                value: "monsters",
+            },
+        ],
+    },
+    {
+        label: "Meta Ads",
+        teams: [
+            {
+                label: "Core Workspace",
+                value: "acme-inc-15",
+            },
+            {
+                label: "Dev.Workspace",
+                value: "monsters-77",
+            },
+        ],
+    },
+]
+
+type Team = (typeof groups)[number]["teams"][number]
 
 type PopoverTriggerProps = React.ComponentPropsWithoutRef<typeof PopoverTrigger>
 
@@ -61,45 +99,11 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
     const { data: session } = useSession();
     const [open, setOpen] = React.useState(false)
     const [showNewTeamDialog, setShowNewTeamDialog] = React.useState(false)
-    const [items, setItems] = React.useState<SwitcherItem[]>([]);
-    const params = useParams();
-    const router = useRouter();
-    const currentId = params?.id as string;
-
-    React.useEffect(() => {
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), 5000);
-
-        fetch("/api/switcher-items", {
-            signal: controller.signal,
-            cache: "no-store",
-        })
-            .then((res) => res.json().catch(() => null))
-            .then((data) => {
-                if (Array.isArray(data?.items)) {
-                    setItems(data.items);
-                }
-            })
-            .catch(() => null)
-            .finally(() => window.clearTimeout(timer));
-
-        return () => {
-            controller.abort();
-            window.clearTimeout(timer);
-        };
-    }, []);
-
-    const selectedItem = React.useMemo(() => {
-        return items.find(item => item.id === currentId);
-    }, [items, currentId]);
-
+    const [selectedTeam, setSelectedTeam] = React.useState<Team>(
+        groups[0].teams[0]
+    )
     if (config.showSwitcher === false || config.sidebar === 'compact') return null
 
-    const handleSelect = (item: SwitcherItem) => {
-        setOpen(false);
-        const locale = params?.locale || "en";
-        router.push(`/${locale}/analytics/${item.id}/page`);
-    };
 
     return (
         <Dialog open={showNewTeamDialog} onOpenChange={setShowNewTeamDialog}>
@@ -119,19 +123,19 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
                             role="combobox"
                             fullWidth
                             aria-expanded={open}
-                            aria-label="Select a client"
+                            aria-label="Select a team"
                             className={cn("  h-14 w-14 mx-auto  p-0 md:p-0  dark:border-secondary ring-offset-sidebar", className)}
                         >
                             <Avatar className="">
                                 <AvatarImage
                                     height={24}
                                     width={24}
-                                    src={selectedItem?.image as any || session?.user?.image as any}
-                                    alt={selectedItem?.name || "Client"}
+                                    src={session?.user?.image as any}
+                                    alt={selectedTeam.label}
                                     className="grayscale"
                                 />
 
-                                <AvatarFallback>{selectedItem?.name?.charAt(0) || session?.user?.name?.charAt(0)}</AvatarFallback>
+                                <AvatarFallback>{session?.user?.name?.charAt(0)}</AvatarFallback>
                             </Avatar>
                         </Button> : <Button
                             variant="outline"
@@ -139,7 +143,7 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
                             role="combobox"
                             fullWidth
                             aria-expanded={open}
-                            aria-label="Select a client"
+                            aria-label="Select a team"
                             className={cn("  h-auto py-3 md:px-3 px-3 justify-start dark:border-secondary ring-offset-sidebar", className)}
                         >
                             <div className=" flex  gap-2 flex-1 items-center">
@@ -147,17 +151,17 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
                                     <AvatarImage
                                         height={38}
                                         width={38}
-                                        src={selectedItem?.image as any || session?.user?.image as any}
-                                        alt={selectedItem?.name || "Client"}
+                                        src={session?.user?.image as any}
+                                        alt={selectedTeam.label}
                                         className="grayscale"
                                     />
 
-                                    <AvatarFallback>{selectedItem?.name?.charAt(0) || session?.user?.name?.charAt(0)}</AvatarFallback>
+                                    <AvatarFallback>{session?.user?.name?.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1 text-start w-[100px]">
 
-                                    <div className=" text-sm  font-semibold text-default-900 truncate">{selectedItem?.name || "Select Client"}</div>
-                                    <div className=" text-xs font-normal text-default-500 dark:text-default-700 truncate capitalize ">{selectedItem ? "Client Dashboard" : "Admin Dashboard"}</div>
+                                    <div className=" text-sm  font-semibold text-default-900">Codeshaper</div>
+                                    <div className=" text-xs font-normal text-default-500 dark:text-default-700 truncate ">{selectedTeam.label}</div>
 
                                 </div>
                                 <div className="">
@@ -168,38 +172,53 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
                     </motion.div>
 
                 </PopoverTrigger>
-                <PopoverContent className="w-[220px] p-0">
+                <PopoverContent className="w-[200px] p-0">
                     <Command>
                         <CommandList>
-                            <CommandInput placeholder="Search client..." className=" placeholder:text-xs" />
-                            <CommandEmpty>No client found.</CommandEmpty>
-                            <CommandGroup heading="Clients">
-                                {items.map((item) => (
-                                    <CommandItem
-                                        key={item.id}
-                                        onSelect={() => handleSelect(item)}
-                                        className="text-sm font-normal py-2"
-                                    >
-                                        <Avatar className="h-6 w-6 mr-2">
-                                            <AvatarImage src={item.image as any} />
-                                            <AvatarFallback>{item.name.charAt(0)}</AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex flex-col">
-                                            <span className="truncate max-w-[120px]">{item.name}</span>
-                                            <span className="text-[10px] text-default-500">{item.email}</span>
-                                        </div>
-                                        <Check
-                                            className={cn(
-                                                "ml-auto h-4 w-4",
-                                                selectedItem?.id === item.id
-                                                    ? "opacity-100"
-                                                    : "opacity-0"
-                                            )}
-                                        />
-                                    </CommandItem>
-                                ))}
-                            </CommandGroup>
+                            <CommandInput placeholder="Search team..." className=" placeholder:text-xs" />
+                            <CommandEmpty>No team found.</CommandEmpty>
+                            {groups.map((group) => (
+                                <CommandGroup key={group.label} heading={group.label}>
+                                    {group.teams.map((team) => (
+                                        <CommandItem
+                                            key={team.value}
+                                            onSelect={() => {
+                                                setSelectedTeam(team)
+                                                setOpen(false)
+                                            }}
+                                            className="text-sm font-normal"
+                                        >
+
+                                            {team.label}
+                                            <Check
+                                                className={cn(
+                                                    "ml-auto h-4 w-4",
+                                                    selectedTeam.value === team.value
+                                                        ? "opacity-100"
+                                                        : "opacity-0"
+                                                )}
+                                            />
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            ))}
                         </CommandList>
+                        <CommandSeparator />
+                        {/* <CommandList>
+                            <CommandGroup>
+                                <DialogTrigger asChild>
+                                    <CommandItem
+                                        onSelect={() => {
+                                            setOpen(false)
+                                            setShowNewTeamDialog(true)
+                                        }}
+                                    >
+                                        <CirclePlus className="mr-2 h-5 w-5" />
+                                        Create Team
+                                    </CommandItem>
+                                </DialogTrigger>
+                            </CommandGroup>
+                        </CommandList> */}
                     </Command>
                 </PopoverContent>
             </Popover>

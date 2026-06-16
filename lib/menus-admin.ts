@@ -34,29 +34,19 @@ export function getMenuList(pathname: string, t: any): Group[] {
   // Normalize pathname in case a full URL is passed in (e.g., http://localhost:3000/en/admin)
   const normalizedPath =
     pathname.startsWith("http") ? new URL(pathname).pathname : pathname;
-  let pathOnly = normalizedPath.split("?")[0].split("#")[0];
+  const pathOnly = normalizedPath.split("?")[0].split("#")[0];
 
-  // Strip locale prefix from pathOnly
-  const match = pathOnly.match(/^\/([a-z]{2})(?:\/|$)(.*)/);
-  if (match) {
-    pathOnly = `/${match[2] || ""}`;
-  }
-  if (pathOnly === "") pathOnly = "/";
+  const segments = pathOnly.replace(/\/$/, "").split("/").filter(Boolean);
+  const firstSegment = segments[0];
+  const hasLocale = !!firstSegment && firstSegment !== "admin";
+  const localeSegment = hasLocale ? firstSegment : "en";
 
-  const adminBase = "/admin";
+  const adminBase = `/${hasLocale ? `${localeSegment}/` : ""}admin`;
   const accountPath = `${adminBase}/account`;
   const newUserPath = `${adminBase}/users/new`;
-  const plansPath = `${adminBase}/plans`;
-  const paymentsPath = `${adminBase}/payments`;
 
-  const isAccount = pathOnly.startsWith(accountPath);
-  const isPlans = pathOnly.startsWith(plansPath);
-  const isPayments = pathOnly.startsWith(paymentsPath);
-  const isUsers =
-    (pathOnly === adminBase || pathOnly.startsWith(`${adminBase}/users`)) &&
-    !isAccount &&
-    !isPlans &&
-    !isPayments;
+  const isAccount = pathname.startsWith(accountPath);
+  const isUsers = pathname.startsWith(adminBase) && !isAccount;
 
   return [
     {
@@ -77,37 +67,21 @@ export function getMenuList(pathname: string, t: any): Group[] {
               icon: "heroicons:queue-list",
               children: [],
             },
-            {
-              href: newUserPath,
-              label: "Create user",
-              active: pathname.startsWith(newUserPath),
-              icon: "heroicons:plus-circle",
-              children: [],
-            },
+            // {
+            //   href: newUserPath,
+            //   label: "Create user",
+            //   active: pathname.startsWith(newUserPath),
+            //   icon: "heroicons:plus-circle",
+            //   children: [],
+            // },
           ],
         },
         {
           id: "account",
           href: accountPath,
-          label: "Connect Channels",
+          label: "Connect Account",
           active: isAccount,
           icon: "heroicons:bolt",
-          submenus: [],
-        },
-        {
-          id: "plans",
-          href: plansPath,
-          label: "Subscription Plans",
-          active: isPlans,
-          icon: "heroicons:currency-dollar",
-          submenus: [],
-        },
-        {
-          id: "payments",
-          href: paymentsPath,
-          label: "Payments",
-          active: isPayments,
-          icon: "heroicons:credit-card",
           submenus: [],
         },
       ],

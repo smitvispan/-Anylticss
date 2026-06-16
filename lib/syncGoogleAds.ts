@@ -21,7 +21,7 @@ async function fetchCustomerClients(
   accessToken: string,
   loginCustomerId?: string
 ): Promise<any[]> {
-  const apiVersion = process.env.GOOGLE_ADS_API_VERSION || "v22";
+  const apiVersion = process.env.GOOGLE_ADS_API_VERSION || "v19";
   const url = `https://googleads.googleapis.com/${apiVersion}/customers/${loginCustomerId || "-"}/googleAds:search`;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
@@ -87,7 +87,7 @@ async function fetchCampaignRows(
   loginCustomerId?: string,
   opts: FetchCampaignOpts = {}
 ) {
-  const apiVersion = process.env.GOOGLE_ADS_API_VERSION || "v22";
+  const apiVersion = process.env.GOOGLE_ADS_API_VERSION || "v19";
   const url = `https://googleads.googleapis.com/${apiVersion}/customers/${customerId}/googleAds:search`;
 
   const includeMetrics = opts.includeMetrics !== false;
@@ -419,73 +419,28 @@ export async function loadCampaignsFromDb(filter: { customerId?: string; subAcco
   return Campaign.find(query).sort({ updatedAt: -1 }).lean();
 }
 
-export async function loadCampaignsFromInsights(filter: {
-  customerId?: string;
-  subAccountId?: string;
-  dateRange?: DateRange;
-}) {
-  await connectDB();
-
-  const query: any = {};
-  if (filter.customerId) query.customerId = normalizeCustomerId(filter.customerId);
-  if (filter.subAccountId) query.googleAdsAccountId = filter.subAccountId;
-  if (filter.dateRange?.since) query["dateRange.since"] = filter.dateRange.since;
-  if (filter.dateRange?.until) query["dateRange.until"] = filter.dateRange.until;
-
-  const insightDocs = await GoogleAdsInsight.find(query).sort({ updatedAt: -1 }).lean();
-
-  return insightDocs.map((insight: any) => ({
-    _id: insight._id,
-    campaignId: insight.campaignId ? String(insight.campaignId) : undefined,
-    customerId: insight.customerId ? String(insight.customerId) : undefined,
-    name: insight.name || `Campaign ${String(insight.campaignId || "").slice(-6)}`,
-    status: "CACHED",
-    advertisingChannelType: "UNKNOWN",
-    biddingStrategyType: "UNKNOWN",
-    campaignBudgetAmountMicros: undefined,
-    metrics: insight.metric || {},
-    userEmail: undefined,
-    userId: undefined,
-    subAccountId: insight.googleAdsAccountId ? String(insight.googleAdsAccountId) : filter.subAccountId,
-    createdAt: insight.createdAt,
-    updatedAt: insight.updatedAt,
-  }));
-}
-
-export async function resolveGoogleAdsAccountForUser(userId: string, requestedAccountId?: string | null) {
+export async function resolveGoogleAdsAccountForUser(userId: string) {
   await connectDB();
 
   const user = await User.findById(userId)
-    .select({ _id: 1, email: 1, role: 1, mainGoogleAd: 1, googleAdsAccounts: 1 })
+    .select({ _id: 1, email: 1, mainGoogleAd: 1, googleAdsAccounts: 1 })
     .lean();
-  if (!user) return { user: null, account: null, accounts: [] };
+  if (!user) return { user: null, account: null };
 
-  const candidateIds = (user.role === "user"
-    ? [user.mainGoogleAd]
-    : [
-        user.mainGoogleAd,
-        ...(Array.isArray(user.googleAdsAccounts) ? user.googleAdsAccounts : []),
-      ]
-  ).filter(Boolean);
-  const hasExplicitAssignments = candidateIds.length > 0;
+  const candidateIds = [
+    user.mainGoogleAd,
+    ...(Array.isArray(user.googleAdsAccounts) ? user.googleAdsAccounts : []),
+  ].filter(Boolean);
 
-  let accounts = candidateIds.length
-    ? await GoogleAdsAccount.find({ _id: { $in: candidateIds } }).sort({ descriptiveName: 1, accountId: 1 }).lean()
-    : [];
+  let account = candidateIds.length
+    ? await GoogleAdsAccount.findOne({ _id: { $in: candidateIds } }).lean()
+    : null;
 
-  if (!accounts.length && !hasExplicitAssignments && user.role !== "user" && user.email) {
-    accounts = await GoogleAdsAccount.find({ userEmail: user.email }).sort({ updatedAt: -1 }).lean();
+  if (!account && user.email) {
+    account = await GoogleAdsAccount.findOne({ userEmail: user.email }).sort({ updatedAt: -1 }).lean();
   }
 
-  const requested = requestedAccountId ? String(requestedAccountId) : "";
-  const fallback = user.mainGoogleAd ? String(user.mainGoogleAd) : "";
-  const account =
-    (requested ? accounts.find((entry) => String(entry._id) === requested) : null) ||
-    (fallback ? accounts.find((entry) => String(entry._id) === fallback) : null) ||
-    accounts[0] ||
-    null;
-
-  return { user, account, accounts };
+  return { user, account };
 }
 
 /**

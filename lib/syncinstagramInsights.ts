@@ -2,7 +2,6 @@
 import connectDB from "@/lib/mongodb";
 import InstagramAccount from "@/models/InstagramAccount";
 import InstagramInsights from "@/models/InstagramInsights";
-import { getMetaGraphApiBase } from "@/lib/meta-api";
 
 /** ===== Types ===== */
 type IGPoint = number | Record<string, unknown>; // total_value.value is a number, but keep flexible
@@ -67,7 +66,7 @@ function buildIGInsightsUrl(
   metrics = DEFAULT_IG_METRICS,
   opts?: { period?: "day" | "week" | "days_28" | "lifetime"; since?: string; until?: string }
 ) {
-  const u = new URL(`${getMetaGraphApiBase()}/${encodeURIComponent(igId)}/insights`);
+  const u = new URL(`https://graph.facebook.com/v19.0/${encodeURIComponent(igId)}/insights`);
   u.searchParams.set("metric", metrics);
   u.searchParams.set("metric_type", "total_value");
   u.searchParams.set("access_token", accessToken);

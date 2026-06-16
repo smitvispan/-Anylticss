@@ -1,6 +1,7 @@
 "use client"
+
 import * as React from "react"
-import dynamic from "next/dynamic";
+import Chart from "react-apexcharts";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -30,7 +31,6 @@ import { Eye, MoreVertical, SquarePen, Trash2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { colors } from "@/lib/colors"
 
-const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export type TeamTableProps = {
   customer: {

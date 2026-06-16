@@ -12,7 +12,6 @@ import Image from "next/image";
 import Social from "@/components/partials/auth/social";
 import Copyright from "@/components/partials/auth/copyright";
 import Logo from "@/components/partials/auth/logo";
-import { getAdminOwnerContext } from "@/lib/admin-user-scope";
 
 type Params = Promise<{ locale: string }>;
 
@@ -23,7 +22,6 @@ function shortId(id?: string | null) {
 
 export default async function AdminUsersPage({ params }: { params: Params }) {
   const { locale } = await params;
-  const ownerContext = await getAdminOwnerContext();
 
   await connectDB();
 
@@ -68,7 +66,7 @@ export default async function AdminUsersPage({ params }: { params: Params }) {
                       </div>
                     </div>
                     <div className="mx-auto mt-8 w-full">
-                      <Social locale={locale} ownerId={ownerContext?.ownerId || null} />
+                      <Social locale={locale} />
                     </div>
                   </div>
                 </div>

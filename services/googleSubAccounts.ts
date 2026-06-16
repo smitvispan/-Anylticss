@@ -23,8 +23,7 @@ export async function getSubAccounts(accessToken: string, MANAGER_ID: string): P
         }
 
         const normalizedManagerId = MANAGER_ID.replace(/-/g, '');
-        const apiVersion = process.env.GOOGLE_ADS_API_VERSION || "v22";
-        const url = `https://googleads.googleapis.com/${apiVersion}/customers/${normalizedManagerId}/googleAds:search`;
+        const url = `https://googleads.googleapis.com/v19/customers/${normalizedManagerId}/googleAds:search`;
 
         const headers = {
             'Authorization': `Bearer ${accessToken}`,
@@ -126,8 +125,7 @@ export async function getSubAccounts(accessToken: string, MANAGER_ID: string): P
  */
 export async function getSubAccountsAlternative(accessToken: string): Promise<SubAccount[]> {
     try {
-        const apiVersion = process.env.GOOGLE_ADS_API_VERSION || "v22";
-        const url = `https://googleads.googleapis.com/${apiVersion}/customers:listAccessibleCustomers`;
+        const url = `https://googleads.googleapis.com/v16/customers:listAccessibleCustomers`;
 
         const headers = {
             'Authorization': `Bearer ${accessToken}`,
@@ -174,3 +172,4 @@ export async function getSubAccountsAlternative(accessToken: string): Promise<Su
         throw error;
     }
 }
+

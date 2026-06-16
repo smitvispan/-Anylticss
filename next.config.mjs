@@ -8,26 +8,11 @@ const withNextra = nextra({
   themeConfig: "./theme.config.tsx",
 });
 
-const isStandaloneBuild = process.env.NEXT_OUTPUT_MODE === "standalone";
-
 const nextConfig = {
-  distDir: process.env.NEXT_DIST_DIR || ".next",
-  ...(isStandaloneBuild ? { output: "standalone" } : {}),
+  output: "standalone",               // optional but recommended on small VPS
   reactStrictMode: true,
-  poweredByHeader: false,
   productionBrowserSourceMaps: false,
-  experimental: {
-    webpackBuildWorker: false,
-  },
-  webpack: (config, { dev }) => {
-    if (config.cache && !dev) {
-      config.cache = Object.freeze({
-        type: "memory",
-      });
-    }
-
-    return config;
-  },
+  eslint: { ignoreDuringBuilds: true },
   async redirects() {
     return [
       {

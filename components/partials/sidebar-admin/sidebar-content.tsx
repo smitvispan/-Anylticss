@@ -53,7 +53,7 @@ const SidebarContent = ({ children }: { children: React.ReactNode }) => {
         <div className="border-b border-slate-200 px-4 py-4">
           <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Admin</p>
           <p className="text-sm font-semibold text-slate-900">Control center</p>
-          <p className="text-[11px] text-slate-600">Clients · Accounts · Channels</p>
+          <p className="text-[11px] text-slate-600">Users · Accounts · Channels</p>
         </div>
         <div className="flex-1 overflow-visible">{children}</div>
       </div>

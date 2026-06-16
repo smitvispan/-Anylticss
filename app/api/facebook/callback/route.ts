@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import connectDB from "@/lib/mongodb";
 import FacebookUser from "@/models/FacebookUser";
 import Page from "@/models/Page";
 import InstagramAccount from "@/models/InstagramAccount";
 import AdAccount from "@/models/AdAccount";
-import { getAppBaseUrl } from "@/lib/env";
-import { checkSubscriptionLimit } from "@/lib/subscription-utils";
-import {
-  buildAnalyticsConnectionsPath,
-  ConnectionOAuthError,
-  decodeConnectionOAuthState,
-  resolveConnectionContext,
-} from "@/lib/connection-oauth";
+import { authOptions } from "@/lib/auth";
 
 async function exchangeCodeForToken(code: string, redirectUri: string) {
   const params = new URLSearchParams({
@@ -97,36 +91,23 @@ async function fetchAdAccounts(accessToken: string) {
 }
 
 export async function GET(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+  const adminId = String(session.user.id);
+
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const rawState = url.searchParams.get("state");
+  const state = url.searchParams.get("state") ?? undefined;
 
   if (!code) {
     return NextResponse.json({ error: "Missing OAuth code" }, { status: 400 });
   }
 
-  const oauthState = decodeConnectionOAuthState(rawState);
-  let context;
-
-  try {
-    context = await resolveConnectionContext({
-      requestedOwnerId: oauthState?.ownerId,
-      requestedWorkspaceId: oauthState?.workspaceId,
-      requestedLocale: oauthState?.locale,
-    });
-  } catch (error: any) {
-    const status = error instanceof ConnectionOAuthError ? error.status : 500;
-    return NextResponse.json(
-      { error: error?.message || "Unable to validate Facebook connection" },
-      { status }
-    );
+  if (state && state !== adminId) {
+    return NextResponse.json({ error: "State mismatch" }, { status: 400 });
   }
-
-  const ownerId = context.ownerId;
-  const returnPath =
-    context.viewerRole === "admin"
-      ? process.env.FACEBOOK_SUCCESS_REDIRECT_URL || `/${context.locale}/admin`
-      : buildAnalyticsConnectionsPath(context);
 
   const redirectUri = process.env.FACEBOOK_REDIRECT_URL;
   if (!redirectUri) {
@@ -158,7 +139,7 @@ export async function GET(req: Request) {
         : null;
 
     const profile = await fetchProfile(accessToken);
-    const facebookId = profile?.id || rawState || "unknown_facebook_user";
+    const facebookId = profile?.id || state || "unknown_facebook_user";
     const email = profile?.email ?? null;
     const name = profile?.name ?? null;
 
@@ -167,18 +148,18 @@ export async function GET(req: Request) {
       { facebookId },
       {
         facebookId,
-        adminId: ownerId,
+        adminId,
         email,
         name,
         accessToken,
         tokenType: tokenData?.token_type ?? "Bearer",
         expiresAt,
-        state: rawState,
+        state,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    const facebookUserId = facebookUser._id;
+    const ownerId = facebookUser._id;
     let pagesCount = 0;
     let igCount = 0;
     let adCount = 0;
@@ -187,17 +168,13 @@ export async function GET(req: Request) {
     try {
       // 1) Pages
       const pages = await fetchPages(accessToken);
-
-      // Enforce Subscription Limit
-      await checkSubscriptionLimit(ownerId, "facebookPages");
-
       pagesCount = pages.length;
       await Promise.all(
         pages.map((p) =>
           Page.findOneAndUpdate(
             { pageId: p.id },
             {
-              userId: facebookUserId,
+              userId: ownerId,
               pageId: p.id,
               name: p.name ?? null,
               link: p.link ?? null,
@@ -216,17 +193,13 @@ export async function GET(req: Request) {
         igPromises.push(
           (async () => {
             const igs = await fetchIgAccountsForPage(p.id, pageToken);
-
-            // Enforce Subscription Limit
-            await checkSubscriptionLimit(ownerId, "instagramAccounts");
-
             igCount += igs.length;
             await Promise.all(
               igs.map((ig) =>
                 InstagramAccount.findOneAndUpdate(
                   { igId: ig.id },
                   {
-                    userId: facebookUserId,
+                    userId: ownerId,
                     igId: ig.id,
                     username: ig.username ?? null,
                     name: ig.name ?? null,
@@ -244,17 +217,13 @@ export async function GET(req: Request) {
 
       // 3) Ad accounts
       const adAccounts = await fetchAdAccounts(accessToken);
-
-      // Enforce Subscription Limit
-      await checkSubscriptionLimit(ownerId, "adAccounts");
-
       adCount = adAccounts.length;
       await Promise.all(
         adAccounts.map((acc) =>
           AdAccount.findOneAndUpdate(
             { adAccountId: acc.id },
             {
-              userId: facebookUserId,
+              userId: ownerId,
               adAccountId: acc.id,
               name: acc.name ?? null,
               account_status: acc.account_status ?? null,
@@ -271,10 +240,8 @@ export async function GET(req: Request) {
       warning = e?.message ?? "Sync failed";
     }
 
-    const redirectUrl = new URL(
-      returnPath,
-      getAppBaseUrl(url.origin)
-    );
+    // const redirectUrl = new URL("/en/admin", url.origin);
+    const redirectUrl = new URL("/en/admin", "https://reports.vispansolutions.com");
     redirectUrl.searchParams.set("facebookConnected", "1");
     redirectUrl.searchParams.set("pages", String(pagesCount));
     redirectUrl.searchParams.set("igs", String(igCount));

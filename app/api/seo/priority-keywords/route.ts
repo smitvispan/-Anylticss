@@ -2,9 +2,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getClientSession } from "@/lib/client-auth-server";
-import connectDB from "@/lib/mongodb";
-import UserKeyword from "@/models/UserKeyword";
+// import prisma from "@/lib/prisma";
+import { prisma } from '@/lib/prisma';
 
 
 // ✅ Your static default 10 keywords (seeded on first save)
@@ -21,59 +20,25 @@ const DEFAULT_KEYWORDS: string[] = [
     "activa 4g accessories",
 ];
 
-async function resolveAuthenticatedUserId() {
-    const clientSession = await getClientSession();
-    if (clientSession?.user?.id) {
-        return clientSession.user.id;
-    }
-
-    const session = await getServerSession(authOptions);
-    if (session?.user?.id) {
-        return session.user.id;
-    }
-
-    return null;
-}
-
-function buildScope(siteUrl?: string, gscSiteId?: string) {
-    const normalizedSiteUrl = siteUrl?.trim() || null;
-    const normalizedGscSiteId = gscSiteId?.trim() || null;
-    const scopeKey = normalizedGscSiteId
-        ? `gsc:${normalizedGscSiteId}`
-        : normalizedSiteUrl
-        ? `site:${normalizedSiteUrl}`
-        : "global";
-
-    return { scopeKey, normalizedSiteUrl, normalizedGscSiteId };
-}
-
 /**
  * GET /api/seo/priority-keywords?siteUrl=sc-domain:example.com
  * Returns: { ok:true, keywords: string[] }
  */
 export async function GET(req: Request) {
     try {
-        const callerId = await resolveAuthenticatedUserId();
-        if (!callerId) {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
             return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
         }
 
         const url = new URL(req.url);
         const siteUrl = url.searchParams.get("siteUrl") ?? undefined;
-        const gscSiteId = url.searchParams.get("gscSiteId") ?? undefined;
-        const targetUserId = url.searchParams.get("targetUserId") ?? undefined;
 
-        const userId = targetUserId || callerId;
-        const { scopeKey } = buildScope(siteUrl, gscSiteId);
-
-        await connectDB();
-
-        const rows = await UserKeyword.find(
-            { userId, scopeKey },
-            { keyword: 1 }
-        )
-            .sort({ createdAt: 1 })
-            .lean<Array<{ keyword: string }>>();
+        const rows: Array<{ keyword: string }> = (await prisma.userKeyword.findMany({
+            where: { userId: session.user.id, siteUrl },
+            orderBy: { createdAt: "asc" },
+            select: { keyword: true },
+        })) as any;
 
         return NextResponse.json({ ok: true, keywords: rows.map((r) => r.keyword) });
     } catch (err: any) {
@@ -92,18 +57,13 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
     try {
-        const callerId = await resolveAuthenticatedUserId();
-        if (!callerId) {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
             return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
         }
 
         const body = await req.json();
         const siteUrl: string | undefined = body.siteUrl ?? undefined;
-        const gscSiteId: string | undefined = body.gscSiteId ?? undefined;
-        const targetUserId = body.targetUserId ?? undefined;
-
-        const userId = targetUserId || callerId;
-        const { scopeKey, normalizedSiteUrl, normalizedGscSiteId } = buildScope(siteUrl, gscSiteId);
 
         let list: string[] = [];
         if (Array.isArray(body.keywords)) {
@@ -126,14 +86,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: "No valid keywords provided" }, { status: 400 });
         }
 
-        await connectDB();
-
         // Fetch existing for this user+site
-        const existing = await UserKeyword.find(
-            { userId, scopeKey },
-            { keyword: 1, keywordNormalized: 1 }
-        ).lean<Array<{ keyword: string; keywordNormalized: string }>>();
-        let existingSet = new Set(existing.map((e) => e.keywordNormalized));
+        const existing: Array<{ keyword: string }> = (await prisma.userKeyword.findMany({
+            where: { userId: session.user.id, siteUrl },
+            select: { keyword: true },
+        })) as any;
+        let existingSet = new Set(existing.map((e) => e.keyword.toLowerCase()));
 
         // ✅ First-time save: seed defaults (insert defaults first so they appear before user keywords in UI)
         if (existing.length === 0) {
@@ -142,15 +100,16 @@ export async function POST(req: Request) {
             );
 
             if (defaultToCreate.length) {
-                await UserKeyword.insertMany(
-                    defaultToCreate.map((keyword) => ({
-                        userId,
-                        scopeKey,
-                        siteUrl: normalizedSiteUrl,
-                        gscSiteId: normalizedGscSiteId,
-                        keyword,
-                        keywordNormalized: keyword.toLowerCase(),
-                    }))
+                await prisma.$transaction(
+                    defaultToCreate.map((k) =>
+                        prisma.userKeyword.create({
+                            data: {
+                                userId: session.user.id,
+                                siteUrl,
+                                keyword: k,
+                            },
+                        })
+                    )
                 );
             }
 
@@ -166,24 +125,24 @@ export async function POST(req: Request) {
         // Now add user's keywords that aren't already present
         const toCreate = normalized.filter((k) => !existingSet.has(k.toLowerCase()));
         if (toCreate.length) {
-            await UserKeyword.insertMany(
-                toCreate.map((keyword) => ({
-                    userId,
-                    scopeKey,
-                    siteUrl: normalizedSiteUrl,
-                    gscSiteId: normalizedGscSiteId,
-                    keyword,
-                    keywordNormalized: keyword.toLowerCase(),
-                }))
+            await prisma.$transaction(
+                toCreate.map((k) =>
+                    prisma.userKeyword.create({
+                        data: {
+                            userId: session.user.id,
+                            siteUrl,
+                            keyword: k,
+                        },
+                    })
+                )
             );
         }
 
-        const rows = await UserKeyword.find(
-            { userId, scopeKey },
-            { keyword: 1 }
-        )
-            .sort({ createdAt: 1 })
-            .lean<Array<{ keyword: string }>>();
+        const rows: Array<{ keyword: string }> = (await prisma.userKeyword.findMany({
+            where: { userId: session.user.id, siteUrl },
+            orderBy: { createdAt: "asc" },
+            select: { keyword: true },
+        })) as any;
 
         return NextResponse.json({ ok: true, keywords: rows.map((r) => r.keyword) });
     } catch (err: any) {
@@ -199,37 +158,37 @@ export async function POST(req: Request) {
  */
 export async function DELETE(req: Request) {
     try {
-        const callerId = await resolveAuthenticatedUserId();
-        if (!callerId) {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
             return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
         }
 
         const body = await req.json();
         const siteUrl: string | undefined = body.siteUrl ?? undefined;
-        const gscSiteId: string | undefined = body.gscSiteId ?? undefined;
-        const targetUserId = body.targetUserId ?? undefined;
         const keywordInput: string = (body.keyword || "").trim();
-
-        const userId = targetUserId || callerId;
-        const { scopeKey } = buildScope(siteUrl, gscSiteId);
         if (!keywordInput) {
             return NextResponse.json({ ok: false, error: "Keyword required" }, { status: 400 });
         }
 
-        await connectDB();
+        // Mongo-safe case-insensitive delete:
+        const candidates: Array<{ id: string; keyword: string }> = (await prisma.userKeyword.findMany({
+            where: { userId: session.user.id, siteUrl },
+            select: { id: true, keyword: true },
+        })) as any;
 
-        await UserKeyword.deleteOne({
-            userId,
-            scopeKey,
-            keywordNormalized: keywordInput.toLowerCase(),
-        });
+        const match = candidates.find(
+            (c) => c.keyword.toLowerCase() === keywordInput.toLowerCase()
+        );
 
-        const rows = await UserKeyword.find(
-            { userId, scopeKey },
-            { keyword: 1 }
-        )
-            .sort({ createdAt: 1 })
-            .lean<Array<{ keyword: string }>>();
+        if (match) {
+            await prisma.userKeyword.delete({ where: { id: match.id } });
+        }
+
+        const rows: Array<{ keyword: string }> = (await prisma.userKeyword.findMany({
+            where: { userId: session.user.id, siteUrl },
+            orderBy: { createdAt: "asc" },
+            select: { keyword: true },
+        })) as any;
 
         return NextResponse.json({ ok: true, keywords: rows.map((r) => r.keyword) });
     } catch (err: any) {

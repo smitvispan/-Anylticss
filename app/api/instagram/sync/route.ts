@@ -1,7 +1,6 @@
 // app/api/instagram/sync/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMetaGraphApiBase } from "@/lib/meta-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,7 +68,7 @@ async function fetchJSON<T>(url: string, params: Record<string, string>) {
 }
 
 async function fetchAccountInsights(igId: string, accessToken: string) {
-  const url = `${getMetaGraphApiBase()}/${igId}/insights`;
+  const url = `https://graph.facebook.com/v19.0/${igId}/insights`;
   const data = await fetchJSON<{ data: AccountInsightMetric[] }>(url, {
     access_token: accessToken,
     metric:
@@ -90,7 +89,7 @@ async function fetchPostPage(
     paging?: { next?: string; cursors?: { after?: string } };
   };
 
-  const base = `${getMetaGraphApiBase()}/${igId}/media`;
+  const base = `https://graph.facebook.com/v19.0/${igId}/media`;
   const params: Record<string, string> = {
     access_token: accessToken,
     fields:
@@ -108,7 +107,7 @@ async function fetchPostInsights(postId: string, accessToken: string) {
   type InsightsResp = {
     data: Array<{ name: string; period: string; values: InsightValue[] }>;
   };
-  const url = `${getMetaGraphApiBase()}/${postId}/insights`;
+  const url = `https://graph.facebook.com/v19.0/${postId}/insights`;
   const data = await fetchJSON<InsightsResp>(url, {
     access_token: accessToken,
     metric: "comments,likes,reach,shares,views,total_interactions",

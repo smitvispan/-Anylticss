@@ -1,23 +1,30 @@
 node_modules/
+.env
+.env.local
+.env.*.local
+.env.production
 .next/
 .next-dev/
 .next-build/
 out/
 dist/
+.vercel/
 
-.env
-.env.local
-.env.*.local
-.env.production
-
-!.env.example
-
-*.tsbuildinfo
-.vercel
-
-# MongoDB
+# MongoDB data files
+WiredTiger
+WiredTiger.lock
+WiredTiger.turtle
+WiredTiger.wt
+WiredTigerHS.wt
+mongod.lock
 journal/
 *.wt
-*.lock
-mongod.lock
-WiredTiger*
+_mdb_catalog.wt
+_tmp/
+storage.bson
+site.id
+*.bson
+
+# Build artifacts
+*.tsbuildinfo
+tsconfig.typecheck.tsbuildinfo

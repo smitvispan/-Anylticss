@@ -53,52 +53,6 @@ function parseRowKeys(row: any, dims: string[]) {
   return out;
 }
 
-function isSearchConsoleAuthError(err: any) {
-  const message = String(err?.message || "");
-  const body = String(err?.body || "");
-
-  return (
-    err?.status === 401 ||
-    message.includes("Missing refresh token") ||
-    message.includes("not connected") ||
-    message.includes("unauthorized_client") ||
-    message.includes("invalid_grant") ||
-    body.includes("unauthorized_client") ||
-    body.includes("invalid_grant")
-  );
-}
-
-async function buildCachedSearchConsoleFallback(params: {
-  userId: string;
-  siteUrl: string;
-  startDate: string;
-  endDate: string;
-  pageContains?: string | null;
-  rowLimit?: number;
-  reason: string;
-}) {
-  const { userId, siteUrl, startDate, endDate, pageContains, rowLimit, reason } = params;
-  const cached = await querySearchConsoleReports({
-    userId,
-    siteUrl,
-    start: startDate,
-    end: endDate,
-    pageContains,
-    limit: Math.max(Number(rowLimit || 500), 1),
-    page: 0,
-  });
-
-  return {
-    totalRows: 0,
-    storedCount: 0,
-    stored: cached,
-    cachedCount: cached.length,
-    siteUrl,
-    skipped: true,
-    message: reason,
-  };
-}
-
 async function fetchSearchConsoleRows(params: {
   accessToken: string;
   siteUrl: string;
@@ -169,24 +123,7 @@ export async function syncSearchConsole({
   const propertyUrl = siteUrl || account.siteUrl;
   if (!propertyUrl) throw new Error("Missing Search Console property URL");
 
-  let accessToken = "";
-  try {
-    accessToken = await ensureSearchConsoleAccessToken(account);
-  } catch (err: any) {
-    if (isSearchConsoleAuthError(err)) {
-      console.warn("[Search Console] Sync skipped, using cached data only:", err?.message || err);
-      return buildCachedSearchConsoleFallback({
-        userId,
-        siteUrl: propertyUrl,
-        startDate,
-        endDate,
-        pageContains,
-        rowLimit,
-        reason: "Search Console account is not connected. Using cached data only.",
-      });
-    }
-    throw err;
-  }
+  let accessToken = await ensureSearchConsoleAccessToken(account);
 
   let rows;
   let dims: string[] = [];
@@ -205,34 +142,18 @@ export async function syncSearchConsole({
   } catch (err: any) {
     const isAuth = err?.status === 401 || String(err?.body || "").includes("invalid_grant");
     if (!isAuth) throw err;
-    try {
-      accessToken = await ensureSearchConsoleAccessToken(account, { forceRefresh: true });
-      const res = await fetchSearchConsoleRows({
-        accessToken,
-        siteUrl: propertyUrl,
-        startDate,
-        endDate,
-        dimensions,
-        pageContains,
-        rowLimit,
-      });
-      rows = res.rows;
-      dims = res.dims;
-    } catch (refreshErr: any) {
-      if (isSearchConsoleAuthError(refreshErr)) {
-        console.warn("[Search Console] Refresh failed, using cached data only:", refreshErr?.message || refreshErr);
-        return buildCachedSearchConsoleFallback({
-          userId,
-          siteUrl: propertyUrl,
-          startDate,
-          endDate,
-          pageContains,
-          rowLimit,
-          reason: "Search Console authorization is invalid. Using cached data only.",
-        });
-      }
-      throw refreshErr;
-    }
+    accessToken = await ensureSearchConsoleAccessToken(account, { forceRefresh: true });
+    const res = await fetchSearchConsoleRows({
+      accessToken,
+      siteUrl: propertyUrl,
+      startDate,
+      endDate,
+      dimensions,
+      pageContains,
+      rowLimit,
+    });
+    rows = res.rows;
+    dims = res.dims;
   }
 
   const stored: any[] = [];
@@ -318,37 +239,24 @@ export async function resolveGscAccountForUser(userId: string) {
   await connectDB();
 
   const user = await User.findById(userId)
-    .select({ _id: 1, email: 1, role: 1, mainSEOsites: 1, googleSearchConsoleAccounts: 1 })
+    .select({ _id: 1, email: 1, mainSEOsites: 1, googleSearchConsoleAccounts: 1 })
     .lean();
-  if (!user) return { user: null, account: null, accounts: [] };
+  if (!user) return { user: null, account: null };
 
-  const candidates = (user.role === "user"
-    ? [user.mainSEOsites]
-    : [
-        user.mainSEOsites,
-        ...(Array.isArray(user.googleSearchConsoleAccounts) ? user.googleSearchConsoleAccounts : []),
-      ]
-  ).filter(Boolean);
-  const hasExplicitAssignments = candidates.length > 0;
+  const candidates = [
+    user.mainSEOsites,
+    ...(Array.isArray(user.googleSearchConsoleAccounts) ? user.googleSearchConsoleAccounts : []),
+  ].filter(Boolean);
 
-  let accounts = hasExplicitAssignments
-    ? await GoogleSearchConsoleAccount.find({ _id: { $in: candidates } }).lean()
-    : [];
+  let account = candidates.length
+    ? await GoogleSearchConsoleAccount.findOne({ _id: { $in: candidates } }).lean()
+    : null;
 
-  if (!accounts.length && !hasExplicitAssignments && user.role !== "user" && user.email) {
-    accounts = await GoogleSearchConsoleAccount.find({ userEmail: user.email })
-      .sort({ updatedAt: -1 })
-      .lean();
+  if (!account && user.email) {
+    account = await GoogleSearchConsoleAccount.findOne({ userEmail: user.email }).sort({ updatedAt: -1 }).lean();
   }
 
-  const mainId = user.mainSEOsites ? String(user.mainSEOsites) : "";
-  accounts.sort((left, right) => {
-    if (String(left._id) === mainId) return -1;
-    if (String(right._id) === mainId) return 1;
-    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
-  });
-
-  return { user, account: accounts[0] || null, accounts };
+  return { user, account };
 }
 
 export function serializeSeoReport(doc: any) {

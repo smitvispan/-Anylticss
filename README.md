@@ -1,59 +1,45 @@
-# Analytics Dashboard
+## Getting Started
 
-Production-ready Next.js application for analytics, admin workflows, OAuth integrations, and documentation pages.
-
-## Requirements
-
-- Node.js 20.x
-- npm 10.x
-- MongoDB
-
-## Local Setup
-
-```bash
+```
 npm ci
-cp .env.example .env.local
+```
+```
+npm run build
+```
+
+This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-Open `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Production Checks
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-```bash
-npm run lint
-npm run typecheck
-npm run build
-```
+This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
 
-Run everything together with:
+## Learn More
 
-```bash
-npm run check
-```
+To learn more about Next.js, take a look at the following resources:
 
-## Environment Variables
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-Use `.env.example` as the source of truth for required configuration.
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
 
-Important production values:
+## Deploy on Vercel
 
-- `NEXT_PUBLIC_SITE_URL` and `NEXTAUTH_URL` must point at the deployed app origin.
-- `NEXTAUTH_SECRET` must be a long random secret.
-- `MONGODB_URI` must point at the production database.
-- Google, Facebook, email, and ERP variables must be set before using their related routes.
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Do not commit `.env.local` or production secrets.
-
-## Deployment Notes
-
-- The app builds with `output: "standalone"` for simpler container or VPS deployments.
-- Build-time linting is enabled, so CI will now fail on real lint errors instead of skipping them.
-- OAuth callback URLs must exactly match the deployed domain values configured in the provider dashboards.
-
-## Start In Production
-
-```bash
-npm run build
-npm run start
-```
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.

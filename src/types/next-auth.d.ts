@@ -9,7 +9,6 @@ declare module "next-auth" {
     provider?: string;
     user: {
       id?: string;
-      role?: string;
       name?: string | null;
       email?: string | null;
       image?: string | null;
@@ -19,7 +18,6 @@ declare module "next-auth" {
   /** Shape of the user returned by providers/authorize() before JWT is created */
   interface User extends DefaultUser {
     id?: string;
-    role?: string;
   }
 }
 
@@ -28,11 +26,8 @@ declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     accessToken?: string;
     provider?: string;
-    id?: string;
-    role?: string;
     user?: {
       id?: string;
-      role?: string;
       name?: string | null;
       email?: string | null;
       image?: string | null;

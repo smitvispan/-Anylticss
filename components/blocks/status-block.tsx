@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
-const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
+const Chart = dynamic(() => import("react-apexcharts"));
 import { useTheme } from "next-themes";
 interface StatusBlockProps {
   className?: string;

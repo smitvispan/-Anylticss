@@ -36,7 +36,7 @@ const DashCodeFooter = async () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <Link href="/admin" className="font-semibold text-sky-700">Users</Link>
-                    <Link href="/admin/account" className="text-slate-700">Channels</Link>
+                    <Link href="/admin/account" className="text-slate-700">Connect</Link>
                 </div>
             </div>
         </FooterContent>

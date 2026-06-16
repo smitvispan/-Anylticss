@@ -2,7 +2,6 @@
 import connectDB from "@/lib/mongodb";
 import Page from "@/models/Page";
 import PageInsights from "@/models/PageInsights";
-import { getMetaGraphApiBase } from "@/lib/meta-api";
 
 /** ===== Types ===== */
 type FBValuePoint = { value: any; end_time?: string };
@@ -77,7 +76,7 @@ function buildFBInsightsUrl(
   until?: string
 ) {
   const u = new URL(
-    `${getMetaGraphApiBase()}/${encodeURIComponent(pageId)}/insights`
+    `https://graph.facebook.com/v19.0/${encodeURIComponent(pageId)}/insights`
   );
   u.searchParams.set("metric", metrics.join(","));
   u.searchParams.set("access_token", accessToken);

@@ -1,48 +1,34 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import connectDB from "@/lib/mongodb";
 import GoogleUser from "@/models/GoogleUser";
-import { getAppBaseUrl, getRequiredEnv } from "@/lib/env";
-import {
-  buildGoogleSaveTokensPath,
-  ConnectionOAuthError,
-  decodeConnectionOAuthState,
-  resolveConnectionContext,
-} from "@/lib/connection-oauth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(req: Request) {
+  const session = await getServerSession(authOptions);
+
+  const adminId = session?.user?.id;
+  if (!adminId) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const rawState = url.searchParams.get("state");
 
   if (!code) {
     return NextResponse.json({ error: "No code found" }, { status: 400 });
   }
 
-  const oauthState = decodeConnectionOAuthState(rawState);
-  let context;
-
-  try {
-    context = await resolveConnectionContext({
-      requestedOwnerId: oauthState?.ownerId,
-      requestedWorkspaceId: oauthState?.workspaceId,
-      requestedLocale: oauthState?.locale,
-    });
-  } catch (error: any) {
-    const status = error instanceof ConnectionOAuthError ? error.status : 500;
-    return NextResponse.json(
-      { error: error?.message || "Unable to validate Google connection" },
-      { status }
-    );
-  }
+  const state = url.searchParams.get("state") ?? undefined;
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id: getRequiredEnv("GOOGLE_CLIENT_ID"),
-      client_secret: getRequiredEnv("GOOGLE_CLIENT_SECRET"),
-      redirect_uri: getRequiredEnv("GOOGLE_REDIRECT_URL"),
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URL!,
       grant_type: "authorization_code",
     }),
   });
@@ -92,9 +78,9 @@ export async function GET(req: Request) {
   const profileName = profile.name || profileEmail || "Google User";
   const profilePic = profile.picture || "";
 
-  const expiresAtSeconds =
+  const expiresAtMs =
     tokenData.expires_in && !Number.isNaN(Number(tokenData.expires_in))
-      ? Math.floor(Date.now() / 1000) + Number(tokenData.expires_in)
+      ? Date.now() + Number(tokenData.expires_in) * 1000
       : null;
 
   await connectDB();
@@ -106,22 +92,19 @@ export async function GET(req: Request) {
       email: profileEmail,
       name: profileName,
       profilePic,
-      adminId: context.ownerId,
+      adminId,
       accessToken,
       refreshToken,
       scope: tokenData.scope,
-      expiresAt: expiresAtSeconds,
+      expiresAt: expiresAtMs,
       tokenType: tokenData.token_type,
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  const redirectUrl = new URL(
-    context.viewerRole === "admin"
-      ? `/${context.locale}/admin/save-google-tokens`
-      : buildGoogleSaveTokensPath(context),
-    getAppBaseUrl(url.origin)
-  );
+  // Redirect to frontend to save Ads + Search Console accounts
+  // const redirectUrl = new URL("/en/admin/save-google-tokens", url.origin);
+  const redirectUrl = new URL("/en/admin/save-google-tokens", "https://reports.vispansolutions.com");
   redirectUrl.searchParams.set("accessToken", accessToken);
   if (refreshToken) {
     redirectUrl.searchParams.set("refreshToken", refreshToken);
@@ -136,8 +119,9 @@ export async function GET(req: Request) {
   if (profileEmail) redirectUrl.searchParams.set("email", profileEmail);
   if (profileName) redirectUrl.searchParams.set("name", profileName);
   if (profilePic) redirectUrl.searchParams.set("profilePic", profilePic);
-  redirectUrl.searchParams.set("ownerId", context.ownerId);
-  if (rawState) redirectUrl.searchParams.set("state", rawState);
+  if (state) {
+    redirectUrl.searchParams.set("state", state);
+  }
 
   return NextResponse.redirect(redirectUrl.toString());
 }

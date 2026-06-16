@@ -3,7 +3,6 @@ import { encode } from "next-auth/jwt";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import { authOptions } from "@/lib/auth";
-import { getAppBaseUrl } from "@/lib/env";
 
 const ERP_LOGIN_URL =
   process.env.ERP_LOGIN_URL || "https://erp.vispansolutions.com/authentication/login";
@@ -48,7 +47,7 @@ async function parseRequest(req: Request): Promise<CallbackPayload> {
 }
 
 function resolveRedirect(target: string | null, requestUrl: URL) {
-  const baseUrl = getAppBaseUrl(requestUrl.origin);
+  const baseUrl = getBaseUrl(requestUrl);
   if (!target) return `${baseUrl}/`;
   try {
     return new URL(target, baseUrl).toString();
@@ -59,13 +58,25 @@ function resolveRedirect(target: string | null, requestUrl: URL) {
 
 function buildAnalyticsPath(locale: string, userId: string) {
   const safeLocale = locale || "en";
-  return `/${safeLocale}/analytics/${userId}`;
+  return `/${safeLocale}/analytics/${userId}/page`;
 }
 
 function sanitizeLocale(locale: string | null | undefined) {
   if (!locale) return "en";
   const match = String(locale).match(/^[A-Za-z-]{2,10}$/);
   return match ? match[0] : "en";
+}
+
+function getBaseUrl(requestUrl: URL) {
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL;
+  if (envUrl) {
+    try {
+      return new URL(envUrl).origin;
+    } catch {
+      // fall through to request origin
+    }
+  }
+  return requestUrl.origin;
 }
 
 function buildLoginRedirect() {
@@ -107,7 +118,7 @@ async function handleRequest(req: Request) {
       id: String(user._id),
       email: user.email || undefined,
       name: user.name || undefined,
-      role: user.isAdmin ? "admin" : "client",
+      role: user.isAdmin ? "admin" : "user",
       provider: "erp-callback",
     },
     secret,

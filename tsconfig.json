@@ -33,18 +33,16 @@
     "module": "esnext"
   },
   "include": [
+    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next-dev/types/**/*.ts",
     ".next/types/**/*.ts",
-    "models/**/*.ts",
-    "next-env.d.ts",
-    ".next-build/types/**/*.ts"
+    "models/**/*.ts"
   ],
   "exclude": [
     "node_modules"
   ],
-  "ts-node": {
+  "ts-node":{
     "esm": true,
     "experimentalResolver": true
   }

@@ -2,12 +2,7 @@ import { NextResponse } from "next/server";
 import { isValidObjectId } from "mongoose";
 import GoogleAdsAccount from "@/models/GoogleAdsAccount";
 import GoogleAdsInsight from "@/models/GoogleAdsInsight";
-import {
-  loadCampaignsFromDb,
-  loadCampaignsFromInsights,
-  syncGoogleCampaignsForAccount,
-  serializeCampaignDoc,
-} from "@/lib/syncGoogleAds";
+import { loadCampaignsFromDb, syncGoogleCampaignsForAccount, serializeCampaignDoc } from "@/lib/syncGoogleAds";
 
 function normalizeCustomerId(raw?: string | null) {
   if (!raw) return "";
@@ -53,17 +48,10 @@ export async function GET(req: Request) {
   const accountCustomerId = normalizeCustomerId(accountDoc?.accountId || accountDoc?.customerId);
   const accountIsManager = !!accountDoc?.manager || (!!managerId && accountCustomerId === managerId);
 
-  let campaigns = await loadCampaignsFromDb({
+  const campaigns = await loadCampaignsFromDb({
     customerId: requestedCustomerId || customerIdParam || undefined,
     subAccountId: accountDoc?._id ? String(accountDoc._id) : undefined,
   });
-  if (!campaigns.length && accountDoc?._id) {
-    campaigns = await loadCampaignsFromInsights({
-      customerId: requestedCustomerId || customerIdParam || syncCustomerId || undefined,
-      subAccountId: String(accountDoc._id),
-      dateRange: dateRange || undefined,
-    });
-  }
   console.log("[Campaigns API][GET] Loaded campaigns from DB", {
     count: campaigns.length,
     subAccountId: accountDoc?._id ? String(accountDoc._id) : null,
