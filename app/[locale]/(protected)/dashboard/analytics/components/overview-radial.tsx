@@ -1,8 +1,9 @@
 "use client"
 
 import { useTheme } from "next-themes";
-import Chart from "react-apexcharts";
+import dynamic from "next/dynamic";
 import { colors } from "@/lib/colors";
+const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 interface OverviewRadialChartProps {
   height?: number;
   series?: number[];

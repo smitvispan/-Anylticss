@@ -9,7 +9,6 @@ const withNextra = nextra({
 });
 
 const nextConfig = {
-  output: "standalone",               // optional but recommended on small VPS
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
   eslint: { ignoreDuringBuilds: true },

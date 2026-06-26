@@ -7,7 +7,7 @@ services:
       npm install
       npm run build
     startCommand: |
-      npm run start
+      npx next start -H 0.0.0.0 -p ${PORT:-10000}
     envVars:
       - key: NODE_ENV
         value: production
@@ -16,7 +16,9 @@ services:
       - key: NEXTAUTH_SECRET
         sync: false
       - key: NEXTAUTH_URL
-        value: https://anylticss-1.onrender.com
+        value: https://analytics-2des.onrender.com
+      - key: NEXT_PUBLIC_SITE_URL
+        value: https://analytics-2des.onrender.com
       - key: RAZORPAY_KEY_ID
         sync: false
       - key: RAZORPAY_KEY_SECRET
