@@ -5,7 +5,7 @@ services:
     plan: free
     nodeVersion: 22.14.0
     buildCommand: |
-      npm install
+      npm install && npx next build
     startCommand: |
       npx next start -H 0.0.0.0 -p ${PORT:-10000}
     healthCheckPath: /en
