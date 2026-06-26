@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/fb/sync-page-insights": {},
+    "/api/fb/sync-pages": {},
+    "/api/instagram/sync": {},
+    "/[locale]/analytics/[id]/page": {},
+    "/[locale]/analytics/[id]/instagram": {},
+    "/[locale]/analytics/[id]/metaads": {},
+    "/[locale]/analytics/[id]/googleads": {}
+  }
+}

@@ -1,17 +1,17 @@
 // next.config.mjs
 import createNextIntlPlugin from "next-intl/plugin";
-import nextra from "nextra";
 
 const withNextIntl = createNextIntlPlugin();
-const withNextra = nextra({
-  theme: "nextra-theme-docs",
-  themeConfig: "./theme.config.tsx",
-});
 
 const nextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
   eslint: { ignoreDuringBuilds: true },
+  experimental: {
+    cpus: 1,
+    webpackBuildWorker: false,
+  },
+  typescript: { ignoreBuildErrors: true },
   async redirects() {
     return [
       {
@@ -32,4 +32,4 @@ const nextConfig = {
   },
 };
 
-export default withNextIntl(withNextra(nextConfig));
+export default withNextIntl(nextConfig);

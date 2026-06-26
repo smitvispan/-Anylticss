@@ -3,9 +3,9 @@ services:
     name: digitalmarketingdashboard
     env: node
     plan: free
+    nodeVersion: 22.14.0
     buildCommand: |
       npm install
-      npm run build
     startCommand: |
       npx next start -H 0.0.0.0 -p ${PORT:-10000}
     envVars:

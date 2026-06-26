@@ -1,0 +1,6 @@
+{
+  "/_error": "pages/_error.js",
+  "/_app": "pages/_app.js",
+  "/en/analytics/[gscSiteId]/seo/[action]/[siteUrl]": "pages/en/analytics/[gscSiteId]/seo/[action]/[siteUrl].js",
+  "/_document": "pages/_document.js"
+}
