@@ -8,6 +8,7 @@ services:
       npm install
     startCommand: |
       npx next start -H 0.0.0.0 -p ${PORT:-10000}
+    healthCheckPath: /en
     envVars:
       - key: NODE_ENV
         value: production
