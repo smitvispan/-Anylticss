@@ -23,9 +23,7 @@ const DashCodeHeader = () => {
     const normalized = pathname || "/";
     const cleaned = normalized.split("?")[0].split("#")[0];
     const segments = cleaned.replace(/\/$/, "").split("/").filter(Boolean);
-    const locale = segments[0] ?? "en";
-    const startsWithLocale = segments[0] && segments[0].length === 2;
-    const base = startsWithLocale ? `/${locale}/admin` : "/admin";
+    const base = "/admin";
     return {
       adminBase: base,
       newUserPath: `${base}/users/new`,
@@ -55,17 +53,17 @@ const DashCodeHeader = () => {
               >
                 Users
               </Link>
-              {/* <Link
+              <Link
                 href={newUserPath}
                 className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold text-white shadow-md shadow-sky-200 transition hover:-translate-y-0.5 hover:bg-sky-700"
               >
-                New user
-              </Link> */}
+                Create user
+              </Link>
               <Link
                 href={accountPath}
                 className="rounded-full border border-slate-200/80 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm"
               >
-                Connect
+                Channels
               </Link>
             </div>
           )}

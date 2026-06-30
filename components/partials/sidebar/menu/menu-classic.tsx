@@ -4,7 +4,10 @@ import React from 'react'
 import { Ellipsis, LogOut } from "lucide-react";
 import { usePathname } from "@/components/navigation";
 import { cn } from "@/lib/utils";
+import { useSession } from "next-auth/react";
 import { getMenuList } from "@/lib/menus";
+import { useClientSession } from "@/providers/client-session.provider";
+import { useWorkspace } from "@/providers/workspace.provider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
     Tooltip,
@@ -32,13 +35,35 @@ export function MenuClassic({ }) {
     // translate
     const t = useTranslations("Menu")
     const pathname = usePathname();
-    const params = useParams<{ locale: string; }>();
+    const params = useParams<{ locale: string; id?: string }>();
     const direction = getLangDir(params?.locale ?? '');
 
     const isDesktop = useMediaQuery('(min-width: 1280px)')
 
 
-    const menuList = getMenuList(pathname, t);
+    const { data: nextAuthSession } = useSession();
+    const clientSession = useClientSession();
+    const isAnalyticsArea = (pathname || "").includes("/analytics/");
+    const session = isAnalyticsArea ? clientSession ?? nextAuthSession : nextAuthSession;
+    const workspace = useWorkspace();
+    const [dynamicRole, setDynamicRole] = React.useState<string | null>(null);
+    const idFromUrl = params?.id as string | undefined;
+
+    React.useEffect(() => {
+        if (idFromUrl && !workspace) {
+            fetch(`/api/client/user-info?id=${idFromUrl}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data?.role) setDynamicRole(data.role);
+                })
+                .catch(() => null);
+        }
+    }, [idFromUrl, workspace]);
+
+    const shouldResolveTargetRole = !!idFromUrl && !workspace;
+    const resolvedTargetRole = workspace?.role || dynamicRole || undefined;
+    const menuUser = shouldResolveTargetRole && !resolvedTargetRole ? null : session?.user;
+    const menuList = getMenuList(pathname, t, menuUser, resolvedTargetRole, workspace?.assignments);
     const [config, setConfig] = useConfig()
     const collapsed = config.collapsed
     const [hoverConfig] = useMenuHoverConfig();

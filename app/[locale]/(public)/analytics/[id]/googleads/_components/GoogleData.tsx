@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 type Campaign = {
     id: string;
@@ -105,8 +105,9 @@ export default function GoogleData({ initialCampaigns, customerId, subAccountNam
 
     useEffect(() => {
         const fallback = getPrevMonthRange();
-        const start = searchParams?.get("start") || fallback.start;
-        const end = searchParams?.get("end") || fallback.end;
+        const params = new URLSearchParams(searchParamsString || "");
+        const start = params.get("start") || fallback.start;
+        const end = params.get("end") || fallback.end;
         setStartDate(start);
         setEndDate(end);
     }, [searchParamsString]);
@@ -203,7 +204,7 @@ export default function GoogleData({ initialCampaigns, customerId, subAccountNam
     }, [campaigns]);
     const totalPages = Math.max(1, Math.ceil(sortedByClicks.length / PAGE_SIZE));
     const pageItems = sortedByClicks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-    const load = async () => {
+    const load = useCallback(async () => {
         if (!customerId) {
             setError("No customer ID available");
             return;
@@ -238,7 +239,7 @@ export default function GoogleData({ initialCampaigns, customerId, subAccountNam
         } finally {
             setLoading(false);
         }
-    };
+    }, [customerId, endDate, startDate, subAccountId]);
     // NEW: Function to handle manual fetch/sync
     const handleFetchSync = async () => {
         if (!subAccountId || !customerId) {
@@ -277,7 +278,7 @@ export default function GoogleData({ initialCampaigns, customerId, subAccountNam
             setError(null);
         }
         load();
-    }, [startDate, endDate, customerId]);
+    }, [customerId, endDate, load, startDate]);
     const dateLabel = useMemo(() => `${startDate} → ${endDate}`, [startDate, endDate]);
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 py-4 sm:py-6 lg:py-8 px-3 sm:px-4 lg:px-8">

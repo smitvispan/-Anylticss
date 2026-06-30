@@ -2,9 +2,13 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
 import { Link, usePathname } from "@/components/navigation";
+import { useParams } from "next/navigation";
 import { useConfig } from '@/hooks/use-config'
 import { useTranslations } from 'next-intl';
 import { getHorizontalMenuList } from "@/lib/menus";
+import { useWorkspace } from "@/providers/workspace.provider";
+import { useSession } from "next-auth/react";
+import { useClientSession } from "@/providers/client-session.provider";
 import { Icon } from "@/components/ui/icon";
 import {
   Menubar,
@@ -25,7 +29,32 @@ export default function HorizontalMenu() {
   const t = useTranslations("Menu");
   const pathname = usePathname();
 
-  const menuList = getHorizontalMenuList(pathname, t)
+  const workspace = useWorkspace();
+  const { data: nextAuthSession } = useSession();
+  const clientSession = useClientSession();
+
+  const isAnalyticsArea = (pathname || "").includes("/analytics/");
+  const session = isAnalyticsArea ? clientSession ?? nextAuthSession : nextAuthSession;
+
+  const params = useParams();
+  const idFromUrl = params?.id as string | undefined;
+  const [dynamicRole, setDynamicRole] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (idFromUrl && !workspace) {
+      fetch(`/api/client/user-info?id=${idFromUrl}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data?.role) setDynamicRole(data.role);
+        })
+        .catch(() => null);
+    }
+  }, [idFromUrl, workspace]);
+
+  const shouldResolveTargetRole = !!idFromUrl && !workspace;
+  const resolvedTargetRole = workspace?.role || dynamicRole || undefined;
+  const menuUser = shouldResolveTargetRole && !resolvedTargetRole ? null : session?.user;
+  const menuList = getHorizontalMenuList(pathname, t, menuUser, resolvedTargetRole);
 
   const [openDropdown, setOpenDropdown] = React.useState<boolean>(false);
 

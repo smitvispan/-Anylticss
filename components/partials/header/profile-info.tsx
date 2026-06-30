@@ -14,10 +14,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import { useSession, signOut } from "next-auth/react"; // ✅ v4 client helpers
-import { usePathname } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
+import { useClientSession } from "@/providers/client-session.provider";
+import { useWorkspace } from "@/providers/workspace.provider";
+import { buildDemoLoginPath, getDemoClientPlanFromEmail } from "@/lib/demo-login";
 
 function getLocaleFromPath(pathname: string) {
   const seg = pathname.split("/").filter(Boolean)[0];
@@ -25,13 +29,50 @@ function getLocaleFromPath(pathname: string) {
   return seg || "en";
 }
 
+function toAbsoluteClientUrl(path: string) {
+  if (typeof window === "undefined") {
+    return path;
+  }
+
+  try {
+    return new URL(path, window.location.origin).toString();
+  } catch {
+    return path;
+  }
+}
+
 const ProfileInfo = () => {
-  const { data: session } = useSession();               // ✅ client session
+  const { data: nextAuthSession } = useSession();               // ✅ client session
+  const clientSession = useClientSession();
+  const workspace = useWorkspace();
   const pathname = usePathname();
+  const params = useParams();
+  const idFromUrl = params?.id as string | undefined;
+
+  const [dynamicName, setDynamicName] = useState<string | null>(null);
+  const [dynamicEmail, setDynamicEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (idFromUrl && !workspace) {
+      fetch(`/api/client/user-info?id=${idFromUrl}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data?.name) setDynamicName(data.name);
+          if (data?.email) setDynamicEmail(data.email);
+        })
+        .catch(() => null);
+    }
+  }, [idFromUrl, workspace]);
+
   const locale = getLocaleFromPath(pathname || "");
+  const isAnalyticsArea = (pathname || "").includes("/analytics/");
+  const session = isAnalyticsArea ? clientSession ?? nextAuthSession : nextAuthSession;
+  const role = session?.user?.role;
+  const isAdminSession = role === "admin" || role === "superadmin";
 
   const avatar = session?.user?.image ?? "/images/avatars/default.png";
-  const alt = session?.user?.name?.charAt(0) ?? "U";
+  const displayName = workspace?.name ?? dynamicName ?? session?.user?.name ?? "User";
+  const alt = displayName.charAt(0) ?? "U";
 
   return (
     <div className="md:block hidden">
@@ -46,7 +87,7 @@ const ProfileInfo = () => {
               className="rounded-full"
             /> */}
             <div className="text-sm font-medium capitalize lg:block hidden">
-              {session?.user?.name ?? "User"}
+              {displayName}
             </div>
             <span className="text-base me-2.5 lg:inline-block hidden">
               <Icon icon="heroicons-outline:chevron-down" />
@@ -65,13 +106,13 @@ const ProfileInfo = () => {
             /> */}
             <div>
               <div className="text-sm font-medium text-default-800 capitalize">
-                {session?.user?.name ?? "User"}
+                {displayName}
               </div>
               <Link
                 href={`/${locale}/dashboard/analytics`}
                 className="text-xs text-default-600 hover:text-primary"
               >
-                {session?.user?.email}
+                {dynamicEmail ?? session?.user?.email}
               </Link>
             </div>
           </DropdownMenuLabel>
@@ -101,10 +142,64 @@ const ProfileInfo = () => {
           {/* ✅ Proper logout (client) */}
           <DropdownMenuItem
             className="flex items-center gap-2 text-sm font-medium text-default-600 capitalize my-1 px-3 cursor-pointer"
-            onSelect={(e) => {
+            onSelect={async (e) => {
               e.preventDefault();
+              if (isAnalyticsArea && clientSession?.user?.id) {
+                const payload = {
+                  workspaceId: idFromUrl || null,
+                  preferredRole: role === "client" || role === "user" ? role : null,
+                };
+                const demoClientPlan = role === "client"
+                  ? getDemoClientPlanFromEmail(session?.user?.email)
+                  : null;
+
+                let redirectPath = `/${locale}/login`;
+
+                try {
+                  const res = await fetch("/api/client/logout", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                  });
+                  const data = await res.json().catch(() => null);
+                  const loggedOutRole = data?.role === "client" || data?.role === "user"
+                    ? data.role
+                    : payload.preferredRole;
+
+                  if (loggedOutRole === "client") {
+                    redirectPath = demoClientPlan
+                      ? buildDemoLoginPath(locale, { mode: "client", plan: demoClientPlan })
+                      : `/${locale}/client/login`;
+                  } else if (loggedOutRole === "user") {
+                    redirectPath =
+                      session?.user?.email === "test@demo.com"
+                        ? buildDemoLoginPath(locale, { mode: "user" })
+                        : `/${locale}/user/login`;
+                  }
+                } catch {
+                  if (payload.preferredRole === "client") {
+                    redirectPath = demoClientPlan
+                      ? buildDemoLoginPath(locale, { mode: "client", plan: demoClientPlan })
+                      : `/${locale}/client/login`;
+                  } else if (payload.preferredRole === "user") {
+                    redirectPath =
+                      session?.user?.email === "test@demo.com"
+                        ? buildDemoLoginPath(locale, { mode: "user" })
+                        : `/${locale}/user/login`;
+                  }
+                }
+
+                window.location.assign(toAbsoluteClientUrl(redirectPath));
+                return;
+              }
+
               signOut({
-                callbackUrl: `/${locale}`, // send back to localized login
+                callbackUrl: toAbsoluteClientUrl(
+                  isAdminSession ? `/${locale}/admin/login` : `/${locale}`
+                ),
               });
             }}
           >
